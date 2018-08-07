@@ -1,0 +1,169 @@
+usage details using lookup tables 
+N8HPC_DUR_JM_GS         634091984  176136.66      4.87       4.61
+N8HPC_DUR_JVH_GETT            168032      46.68      0.00       0.00
+N8HPC_DUR_MB_DMSCC          12689732    3524.93      0.10       0.09
+N8HPC_DUR_MRW_ASW          21211168    5891.99      0.16       0.15
+N8HPC_DUR_SJC_ESCUC          73204617   20334.62      0.56       0.53
+N8HPC_DUR_XM_IOCLTF         225310400   62586.22      1.73       1.64
+N8HPC_LAN_JA_CNAG         171527056   47646.40      1.32       1.25
+N8HPC_LAN_MBP_SS            591040     164.18      0.00       0.00
+N8HPC_LAN_MSC_WTD         555426941  154285.26      4.27       4.03
+N8HPC_LAN_NDD_QMC        1432457136  397904.76     11.00      10.40
+N8HPC_LAN_VF_GRAPHENE         108855936   30237.76      0.84       0.79
+N8HPC_LDS_AJS_DFTMM         491346266  136485.07      3.77       3.57
+N8HPC_LDS_AMH_CCSEH         197165192   54768.11      1.51       1.43
+N8HPC_LDS_CAJ_PDM         575083776  159745.49      4.42       4.18
+N8HPC_LDS_DJH_SAMCOP          60591582   16830.99      0.47       0.44
+N8HPC_LDS_DS_QCMD          67576992   18771.39      0.52       0.49
+N8HPC_LDS_JP_CODITA         197211680   54781.02      1.51       1.43
+N8HPC_LDS_KSC_GASSP           3109552     863.76      0.02       0.02
+N8HPC_LDS_KSC_UKCA           5227888    1452.19      0.04       0.04
+N8HPC_LDS_LJG_DOTNH         113716114   31587.81      0.87       0.83
+N8HPC_LDS_MCD_SUPPORT                 2       0.00      0.00       0.00
+N8HPC_LDS_RWK_ESDGS          88484312   24578.98      0.68       0.64
+N8HPC_LDS_SAH_CSB          17902597    4972.94      0.14       0.13
+N8HPC_LDS_SRA_CESM          36703360   10195.38      0.28       0.27
+N8HPC_LIV_AT_OBM         113328384   31480.11      0.87       0.82
+N8HPC_LIV_GB_AHPCF         395997696  109999.36      3.04       2.88
+N8HPC_LIV_GD_BWMI         440248320  122291.20      3.38       3.20
+N8HPC_LIV_GD_CIMFCB        1391947424  386652.06     10.69      10.11
+N8HPC_LIV_GT_DINNP          64108756   17807.99      0.49       0.47
+N8HPC_LIV_ML_NMSTBW          33117604    9199.33      0.25       0.24
+N8HPC_MCR_AR_HRCG         360448896  100124.69      2.77       2.62
+N8HPC_MCR_AR_PELS         523238656  145344.07      4.02       3.80
+N8HPC_MCR_DB_EMEG            153392      42.61      0.00       0.00
+N8HPC_MCR_DS_BYOE           1028352     285.65      0.01       0.01
+N8HPC_MCR_MKB_INSTALL               266       0.07      0.00       0.00
+N8HPC_MCR_PL_ASIM         269642176   74900.60      2.07       1.96
+N8HPC_MCR_PM_CCFP           5751000    1597.50      0.04       0.04
+N8HPC_MCR_WS_OAGG               192       0.05      0.00       0.00
+N8HPC_MCR_XFY_CFF        1094739392  304094.28      8.41       7.95
+N8HPC_NCL_CFB_QF         134736596   37426.83      1.03       0.98
+N8HPC_NCL_GS_MFGSRIM         110592640   30720.18      0.85       0.80
+N8HPC_NCL_JB_NASBM          98865945   27462.76      0.76       0.72
+N8HPC_NCL_LT_VIMMCOS          37964515   10545.70      0.29       0.28
+N8HPC_NCL_MA_MSH          25700799    7139.11      0.20       0.19
+N8HPC_NCL_MK_NDAAS               315       0.09      0.00       0.00
+N8HPC_NCL_NC_CSFUTRFM         563912164  156642.27      4.33       4.10
+N8HPC_NCL_PB_FPSM         131568256   36546.74      1.01       0.96
+N8HPC_NCL_PW_HPCESC                 0       0.00      0.00       0.00
+N8HPC_NCL_SMG_SUPPTEAM              1209       0.34      0.00       0.00
+N8HPC_SHE_DL_MUSCULO                 0       0.00      0.00       0.00
+N8HPC_SHE_JH_CACO         581321808  161478.28      4.46       4.22
+N8HPC_SHE_JMC_CICS           4729250    1313.68      0.04       0.03
+N8HPC_SHE_NQ_AERO         337836449   93843.46      2.59       2.45
+N8HPC_SHE_PR_DRAGRED          91096941   25304.71      0.70       0.66
+N8HPC_SHE_SHE_TURB        1009286384  280357.33      7.75       7.33
+N8HPC_YRK_AT_SUPPORT               715       0.20      0.00       0.00
+N8HPC_YRK_JM_HHCGP          10118935    2810.82      0.08       0.07
+N8HPC_YRK_KM_IONDYN          37772208   10492.28      0.29       0.27
+N8HPC_YRK_MP_CASTEP           2606272     723.96      0.02       0.02
+N8HPC_YRK_RC_VAMPIRE          13007808    3613.28      0.10       0.09
+N8HPC_YRK_RS_CNAPINF          19056332    5293.43      0.15       0.14
+N8HPC_YRK_RT_VIREVOL          13342831    3706.34      0.10       0.10
+N8HPC_YRK_RV_EPOCH                 0       0.00      0.00       0.00
+N8HPC_YRK_SD_SABRE           1826394     507.33      0.01       0.01
+N8HPC_YRK_SS_EAH            131503      36.53      0.00       0.00
+N8HPC_YRK_YH_NANORG          11522743    3200.76      0.09       0.08
+        Total   13020402873   3616778.58                 94.57
+wallclock time with no adjustments 
+N8HPC_DUR_JM_GS         634091984  176136.66       4.91       4.61
+N8HPC_DUR_JVH_GETT            168032      46.68       0.00       0.00
+N8HPC_DUR_MB_DMSCC           8270484    2297.36       0.06       0.06
+N8HPC_DUR_MRW_ASW          21211168    5891.99       0.16       0.15
+N8HPC_DUR_SJC_ESCUC          73204617   20334.62       0.57       0.53
+N8HPC_DUR_XM_IOCLTF         225310400   62586.22       1.74       1.64
+N8HPC_LAN_JA_CNAG         171527056   47646.40       1.33       1.25
+N8HPC_LAN_MBP_SS            591040     164.18       0.00       0.00
+N8HPC_LAN_MSC_WTD         555426941  154285.26       4.30       4.03
+N8HPC_LAN_NDD_QMC        1432457136  397904.76      11.08      10.40
+N8HPC_LAN_VF_GRAPHENE         108855936   30237.76       0.84       0.79
+N8HPC_LDS_AJS_DFTMM         491346266  136485.07       3.80       3.57
+N8HPC_LDS_AMH_CCSEH         197165192   54768.11       1.53       1.43
+N8HPC_LDS_CAJ_PDM         575083776  159745.49       4.45       4.18
+N8HPC_LDS_DJH_SAMCOP          60591582   16830.99       0.47       0.44
+N8HPC_LDS_DS_QCMD          67576992   18771.39       0.52       0.49
+N8HPC_LDS_JP_CODITA         197211680   54781.02       1.53       1.43
+N8HPC_LDS_KSC_GASSP           3109552     863.76       0.02       0.02
+N8HPC_LDS_KSC_UKCA           5227888    1452.19       0.04       0.04
+N8HPC_LDS_LJG_DOTNH         113716114   31587.81       0.88       0.83
+N8HPC_LDS_MCD_SUPPORT                 2       0.00       0.00       0.00
+N8HPC_LDS_RWK_ESDGS          22119355    6144.27       0.17       0.16
+N8HPC_LDS_SAH_CSB          17286509    4801.81       0.13       0.13
+N8HPC_LDS_SRA_CESM          36703360   10195.38       0.28       0.27
+N8HPC_LIV_AT_OBM         113328384   31480.11       0.88       0.82
+N8HPC_LIV_GB_AHPCF         395997696  109999.36       3.06       2.88
+N8HPC_LIV_GD_BWMI         440248320  122291.20       3.41       3.20
+N8HPC_LIV_GD_CIMFCB        1391947424  386652.06      10.77      10.11
+N8HPC_LIV_GT_DINNP          64108756   17807.99       0.50       0.47
+N8HPC_LIV_ML_NMSTBW          33117604    9199.33       0.26       0.24
+N8HPC_MCR_AR_HRCG         360448896  100124.69       2.79       2.62
+N8HPC_MCR_AR_PELS         523238656  145344.07       4.05       3.80
+N8HPC_MCR_DB_EMEG            153392      42.61       0.00       0.00
+N8HPC_MCR_DS_BYOE           1028352     285.65       0.01       0.01
+N8HPC_MCR_MKB_INSTALL               266       0.07       0.00       0.00
+N8HPC_MCR_PL_ASIM         269642176   74900.60       2.09       1.96
+N8HPC_MCR_PM_CCFP           5751000    1597.50       0.04       0.04
+N8HPC_MCR_WS_OAGG               192       0.05       0.00       0.00
+N8HPC_MCR_XFY_CFF        1094739392  304094.28       8.47       7.95
+N8HPC_NCL_CFB_QF         134696116   37415.59       1.04       0.98
+N8HPC_NCL_GS_MFGSRIM         110592640   30720.18       0.86       0.80
+N8HPC_NCL_JB_NASBM          98865945   27462.76       0.76       0.72
+N8HPC_NCL_LT_VIMMCOS          37964515   10545.70       0.29       0.28
+N8HPC_NCL_MA_MSH          25700799    7139.11       0.20       0.19
+N8HPC_NCL_MK_NDAAS               315       0.09       0.00       0.00
+N8HPC_NCL_NC_CSFUTRFM         563912164  156642.27       4.36       4.10
+N8HPC_NCL_PB_FPSM         131568256   36546.74       1.02       0.96
+N8HPC_NCL_PW_HPCESC                 0       0.00       0.00       0.00
+N8HPC_NCL_SMG_SUPPTEAM              1209       0.34       0.00       0.00
+N8HPC_SHE_DL_MUSCULO                 0       0.00       0.00       0.00
+N8HPC_SHE_JH_CACO         581321808  161478.28       4.50       4.22
+N8HPC_SHE_JMC_CICS           2364633     656.84       0.02       0.02
+N8HPC_SHE_NQ_AERO         336306776   93418.55       2.60       2.44
+N8HPC_SHE_PR_DRAGRED          91096941   25304.71       0.70       0.66
+N8HPC_SHE_SHE_TURB        1009286384  280357.33       7.81       7.33
+N8HPC_YRK_AT_SUPPORT               715       0.20       0.00       0.00
+N8HPC_YRK_JM_HHCGP           4492815    1248.00       0.03       0.03
+N8HPC_YRK_KM_IONDYN          37772208   10492.28       0.29       0.27
+N8HPC_YRK_MP_CASTEP           2606272     723.96       0.02       0.02
+N8HPC_YRK_RC_VAMPIRE          13007808    3613.28       0.10       0.09
+N8HPC_YRK_RS_CNAPINF           7515878    2087.74       0.06       0.05
+N8HPC_YRK_RT_VIREVOL          13342831    3706.34       0.10       0.10
+N8HPC_YRK_RV_EPOCH                 0       0.00       0.00       0.00
+N8HPC_YRK_SD_SABRE            763282     212.02       0.01       0.01
+N8HPC_YRK_SS_EAH            131503      36.53       0.00       0.00
+N8HPC_YRK_YH_NANORG           8642688    2400.75       0.07       0.06
+        Total   12923958069    3589988.35                    93.86
+Slot    1 used   57922.02 
+Slot    2 used    4825.93 
+Slot    3 used    4918.12 
+Slot    4 used    2214.31 
+Slot    5 used      13.81 
+Slot    6 used      33.33 
+Slot    8 used   14381.66 
+Slot    9 used      12.65 
+Slot   12 used    8323.11 
+Slot   14 used     444.31 
+Slot   16 used  281028.70 
+Slot   20 used       0.72 
+Slot   26 used       0.07 
+Slot   32 used  134315.01 
+Slot   36 used     866.12 
+Slot   48 used   64850.85 
+Slot   64 used  494605.94 
+Slot   72 used       0.30 
+Slot   80 used  165321.73 
+Slot   96 used  167974.56 
+Slot  112 used    1032.36 
+Slot  128 used  936881.00 
+Slot  144 used  156543.24 
+Slot  176 used   24796.35 
+Slot  192 used  141023.57 
+Slot  224 used  103362.19 
+Slot  256 used  640435.77 
+Slot  320 used   30720.18 
+Slot  384 used   36869.33 
+Slot  512 used   73136.21 
+Slot  896 used   53080.04 
+Slot 1024 used   16845.08 
+   TOTAL    3616778 
