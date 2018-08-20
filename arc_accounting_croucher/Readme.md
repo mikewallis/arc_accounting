@@ -2,7 +2,7 @@ I set out to answer the following questions:
 
 * How many users have only ever run 1 core jobs
 * How many users have never asked for more than 40 cores?
-* HGow many users have never used more than 4 nodes?
+* How many users have never used more than 4 nodes?
 * How many users combined have used the same number of CPU hours as the top user?
 * How many users combined have used the same number of CPU hours as the top 10 users?
 
