@@ -17,9 +17,11 @@ I set out to answer the following questions:
 
 ## ARC 3
 
-From `who_uses_what_arc3.sh` : 
+`qsub who_uses_what_arc3.sh`
 
 ```
+dc1s1b3b.arc3.leeds.ac.uk
+Mon 20 Aug 17:56:35 BST 2018
 number of uniuqe users
     440     445    3149
 number who have only ever submitted single core jobs
@@ -32,16 +34,13 @@ number who have never asked for more than 72 cores?
     319     636    3145
 number who have never asked for more than 96 cores?
     344     686    3399
-```
-
-Then run `users_below_top_arc3.R` in R to get 
-
-```
+Generating cpu_users_arc3.txt which shows how much CPU time each user has used
 [1] "arc3"
 [1] "There are  437  users"
 [1] "Top user has used more than the bottom  383  combined"
 [1] "Top 10 users have used more than the bottom  427  combined"
-```
+``` 
+
 
 ## ARC 2
 

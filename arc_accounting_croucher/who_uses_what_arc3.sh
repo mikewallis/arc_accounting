@@ -4,6 +4,10 @@
 
 accounting_file=/services/sge_prod/default/common/accounting
 
+
+hostname
+date
+
 #How many unique users?
 echo 'number of uniuqe users'
 cut $accounting_file -f 4 -d ':' | sort | uniq | wc
@@ -23,5 +27,9 @@ gawk -F: '$35>=slots[$4] {slots[$4]=$35};END{for(n in slots){if(slots[n]<=72){pr
 echo 'number who have never asked for more than 96 cores?'
 gawk -F: '$35>=slots[$4] {slots[$4]=$35};END{for(n in slots){if(slots[n]<=96){print n, slots[n]}}}' $accounting_file | wc
 
-echo 'Who uses the most CPU time'
+echo 'Generating cpu_users_arc3.txt which shows how much CPU time each user has used'
 awk -F: '{cpu[$4]+=$37};END{for(a in cpu){printf "%.0f %s\n",cpu[a],a}}' $accounting_file | sort -n > cpu_users_arc3.txt
+
+module load R/3.5.0
+Rscript users_below_top_arc3.R
+
