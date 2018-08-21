@@ -46,4 +46,24 @@ Generating cpu_users_arc3.txt which shows how much CPU time each user has used
 
 ## ARC 2
 
-Job is still in the queue
+```
+h3s2b14.arc2.leeds.ac.uk
+Tue Aug 21 01:40:50 BST 2018
+number of uniuqe users
+    705     710    5001
+number who have only ever submitted single core jobs
+    108     216     978
+number who have never asked for more than 40 cores?
+    439     876    4306
+number who have never asked for more than 16 cores?
+    341     680    3275
+number who have never asked for more than 32 cores?
+    434     866    4253
+number who have never asked for more than 48 cores?
+    449     896    4416
+Who uses the most CPU time
+[1] "arc2"
+[1] "There are  702  users"
+[1] "Top user has used more than the bottom  546  combined"
+[1] "Top 10 users have used more than the bottom  651  combined"
+```
