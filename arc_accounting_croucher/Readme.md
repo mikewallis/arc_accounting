@@ -46,6 +46,8 @@ Generating cpu_users_arc3.txt which shows how much CPU time each user has used
 
 ## ARC 2
 
+`qsub who_uses_what_arc2.sh`
+
 ```
 h3s2b14.arc2.leeds.ac.uk
 Tue Aug 21 01:40:50 BST 2018
