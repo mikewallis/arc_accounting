@@ -167,16 +167,16 @@ def allocs(allocs = "/var/log/local2"):
 # simple integer
 def number(num):
    # Suffix to expand?
-   r = number_suffix_def.match(num)
+   r = number_suffix_def.match(str(num))
    if r:
       for e in enumerate(["K", "M", "G", "T"], start=1):
-         if e[1] == r.group(2): return 1024**int(e[0])
+         if e[1] == r.group(2): return int(r.group(1))*1024**int(e[0])
 
       for e in enumerate(["k", "m", "g", "t"], start=1):
-         if e[1] == r.group(2): return 1000**int(e[0])
+         if e[1] == r.group(2): return int(r.group(1))*1000**int(e[0])
 
    # Time to expand?
-   r = number_time_def.match(num)
+   r = number_time_def.match(str(num))
    if r:
       return int(r.group(1))*3600 + int(r.group(2))*60 + int(r.group(3))
 
