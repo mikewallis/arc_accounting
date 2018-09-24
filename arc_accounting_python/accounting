@@ -1,0 +1,241 @@
+#!/bin/env python
+
+# Accounting file parser, to answer questions such as:
+# - What is the breakdown of usage between faculties?
+# - What is the breakdown of usage between users?
+# - What is the breakdown of usage between users within a faculty?
+
+import argparse
+import os
+import re
+import sys
+import math
+import sge
+
+from datetime import datetime
+from tabulate import tabulate
+
+# Command line arguments
+# ----------------------
+
+parser = argparse.ArgumentParser(description='Report on accounting data')
+parser.add_argument('--date', action='store', type=str)
+parser.add_argument('--skipqueues', action='append', type=str)
+parser.add_argument('--queues', action='append', type=str)
+parser.add_argument('--owners', action='append', type=str)
+parser.add_argument('--skipowners', action='append', type=str)
+parser.add_argument('--coreowners', action='store_true', default=False)
+parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize)
+parser.add_argument('--accountingfile', action='append', type=str)
+
+args = parser.parse_args()
+
+# Restrict to the core purchasers of ARC, if requested
+if args.coreowners:
+   args.owners = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
+
+# Read default accounting file if none specified
+if not args.accountingfile:
+   args.accountingfile = [ os.environ["SGE_ROOT"] + "/" + os.environ["SGE_CELL"] + "/common/accounting" ]
+
+
+# Prepare regexes
+# ---------------
+
+time_startend_def = re.compile(r"^(\d+)(-(\d+))?$")
+
+datetime_def = re.compile(r"^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?$")
+
+owner_def = re.compile(r"^([a-z]+_)?(\S+)")
+
+
+# Routines
+# --------
+
+def main():
+   # Parse date argument
+   start_time, end_time = parse_startend(args.date)
+
+   users = {}
+   owners = {}
+
+   for accounting in args.accountingfile:
+      for record in sge.records(accounting=accounting):
+         if record['end_time'] >= start_time and record['start_time'] < end_time:
+            # Job ended in requested time period
+
+            # - Queue filtering
+            if args.skipqueues and record['qname'] in args.skipqueues: continue
+            if args.queues and record['qname'] not in args.queues: continue
+
+            user = record['owner'] # (refers to job owner here, not equipment owner)
+
+            # - Collect data per equipment owner
+            r = owner_def.match(record['project'])
+            if r:
+               owner = r.group(2)
+
+               # - owner filtering
+               if args.skipowners and owner in args.skipowners: continue
+               if args.owners and owner not in args.owners: continue
+
+               # - init data
+               if user not in users:
+                  users[user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
+
+               if owner not in owners:
+                  owners[owner] = {}
+
+               if user not in owners[owner]:
+                  owners[owner][user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
+
+               # - record usage
+               users[user]['jobs'] += 1
+               owners[owner][user]['jobs'] += 1
+
+               t = core_hours(record)
+               users[user]['time'] += t[0]
+               owners[owner][user]['time'] += t[0]
+               users[user]['time_adj'] += t[1]
+               owners[owner][user]['time_adj'] += t[1]
+
+   # Calculate a summary for each user
+   ##DEBUG - remove duplication between users and owners in above loop
+
+   # Calculate a summary for each owner
+   owner_summaries = {}
+
+   for owner, data in owners.items():
+      owner_summaries[owner] = { 'users': 0, 'jobs': 0, 'time': 0, 'time_adj': 0 }
+
+      for user in data.values():
+         owner_summaries[owner]['users'] += 1
+         owner_summaries[owner]['jobs'] += user['jobs']
+         owner_summaries[owner]['time'] += user['time']
+         owner_summaries[owner]['time_adj'] += user['time_adj']
+
+   # Spit out answer
+   print_summary(owners, users, owner_summaries)
+
+
+def print_summary(owners, users, owner_summaries):
+
+   # Note: lots of promoting ints to floats for two reasons:
+   # - make divisions behave the same on python2
+   # - tabulate only provides the option to separate thousands for floats
+
+   h = [ 'Owner', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
+
+   print("===========")
+   print("Top owners:")
+   print("===========\n")
+
+   d = []
+   for owner, data in sorted(owner_summaries.items(), key=lambda o: o[1]['time_adj'], reverse=True):
+      d.append([
+         owner,
+         float(data['users']),
+         float(data['jobs']),
+         float(round(data['time'] / float(3600))),
+         float(round(data['time_adj'] / float(3600))),
+      ])
+
+   print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+
+   print("==========")
+   print("Top users:")
+   print("==========\n")
+
+   h = [ 'User', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
+   d = []
+   count = 0
+   for user, data in sorted(users.items(), key=lambda u: u[1]['time_adj'], reverse=True):
+      count += 1
+      if count > args.limitusers: break
+      d.append([
+         user,
+         float(data['jobs']),
+         float(round(data['time'] / float(3600))),
+         float(round(data['time_adj'] / float(3600))),
+      ])
+
+   print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+
+   print("===================")
+   print("Top users by owner:")
+   print("===================\n")
+   for owner in sorted(owners):
+      print("Owner:", owner)
+      d = []
+      count = 0
+      for user, data in sorted(owners[owner].items(), key=lambda u: u[1]['time_adj'], reverse=True):
+         count += 1
+         if count > args.limitusers: break
+         d.append([
+            user,
+            float(data['jobs']),
+            float(round(data['time'] / float(3600))),
+            float(round(data['time_adj'] / float(3600))),
+         ])
+
+      print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+
+
+# Calculate the number of core hours used by a job
+def core_hours(record):
+   # Simple (wallclock times cores)
+   time = record['ru_wallclock'] * record['slots']
+
+   # Complicated (adjusted for large memory requests)
+   time_adj = time
+
+   # - obtain memory per core
+   mem_core = None
+   nt = sge.category_resource(record['category'], 'node_type')
+   if nt:
+      cores  = sge.number(sge.node_type(nt, 'num_pe'))
+      memory = sge.number(sge.node_type(nt, 'memory'))
+
+      if cores and memory:
+         mem_core = int(memory / float(cores))
+
+   # - obtain memory request
+   mem_req = sge.category_resource(record['category'], 'h_vmem')
+   if mem_req:
+      mem_req = sge.number(mem_req)
+
+   if mem_req is not None and mem_core is not None:
+      time_adj *= math.ceil(mem_req / float(mem_core))
+
+   return time, time_adj
+
+
+def parse_startend(date_str):
+   start, end = None, None
+
+   r = time_startend_def.match(date_str)
+   if r:
+      start = parse_date(r.group(1))
+      end   = parse_date(r.group(3))
+
+   return start, end
+
+
+def parse_date(date):
+   if date:
+      r = datetime_def.match(date)
+      if r:
+         # Convert strings to integers
+         l = [ int(e) for e in r.groups() if e != None ]
+
+         # Return seconds since epoch
+         return int(datetime(*l).strftime('%s'))
+
+   return None
+
+
+# Run program
+# -----------
+
+main()
+
