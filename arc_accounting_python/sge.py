@@ -9,8 +9,6 @@ import re
 # - need to embed function documentation in a pythonic way, rather
 #   than as comments
 
-accounting = os.environ["SGE_ROOT"] + "/" + os.environ["SGE_CELL"] + "/common/accounting"
-
 record_def = re.compile(r"""
    (?P<qname>[^:#]+)
    :(?P<hostname>[^:]+)
