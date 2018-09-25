@@ -88,7 +88,8 @@ node_type_def = re.compile(r"""
 def records(accounting = os.environ["SGE_ROOT"] +
                         "/" +
                         os.environ["SGE_CELL"] +
-                        "/common/accounting"
+                        "/common/accounting",
+            filter = None,
           ):
    for line in open(accounting):
       r = record_def.match(line)
@@ -145,6 +146,11 @@ def records(accounting = os.environ["SGE_ROOT"] +
                   ]:
             d[f] = float(d[f])
 
+         # Filter out undesirable records
+         if filter:
+            if not filter(d): continue
+
+         # Return record
          yield(d)
 
 
