@@ -149,6 +149,8 @@ def print_summary(owners, users, owner_summaries):
    print("Top users:")
    print("==========\n")
 
+   print_simplestats(users, args.limitusers)
+
    h = [ 'User', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
    d = []
    count = 0
@@ -169,6 +171,7 @@ def print_summary(owners, users, owner_summaries):
    print("===================\n")
    for owner in sorted(owners):
       print("Owner:", owner)
+      print_simplestats(owners[owner], args.limitusers)
       d = []
       count = 0
       for user, data in sorted(owners[owner].items(), key=lambda item: item[1]['time_adj'], reverse=True):
@@ -182,6 +185,38 @@ def print_summary(owners, users, owner_summaries):
          ])
 
       print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+
+
+def print_simplestats(data, top_n):
+#   # Rewrite with reduce
+#   top_usage = 0
+#   for e in enumerate(sorted(data.items(), key=lambda item: item[1]['time_adj'], reverse=True)):
+#      if e[0] >= top_n: break
+#      top_usage += e[1][1]['time_adj']
+
+#   bottom_usage = 0
+#   bottom_n = 0
+#   for e in enumerate(sorted(data.items(), key=lambda item: item[1]['time_adj'])):
+#      bottom_usage += e[1][1]['time_adj']
+#      if bottom_usage > top_usage:
+#         bottom_n = max(0, e[0] -1)
+#         break
+
+#   if top_n <= len(data):
+#      print(
+#         len(data),"active users.",
+#         "Top", top_n, "("+percent(top_n/len(data))+")",
+#         "active users have used more than the bottom",
+#         bottom_n, "("+percent(bottom_n/len(data))+")", "combined",
+#      )
+#   else:
+#      print(len(data),"active users.", "Top", top_n, "skipped")
+
+   print(len(data),"active users.")
+
+
+def percent(num):
+   return "{0:.0%}".format(float(num))
 
 
 # Calculate the number of core hours used by a job
@@ -210,18 +245,19 @@ def core_hours(record):
    if mem_req is not None and mem_core is not None:
       time_adj *= math.ceil(mem_req / float(mem_core))
    else:
-      print("Warning: could not extract mem details from ", record['category'], file=sys.stderr)
+      print("Warning: could not extract mem details from", record['category'], file=sys.stderr)
 
    return time, time_adj
 
 
 def parse_startend(date_str):
-   start, end = None, None
+   start, end = 0, sys.maxsize
 
-   r = time_startend_def.match(date_str)
-   if r:
-      start = parse_date(r.group(1))
-      end   = parse_date(r.group(3))
+   if date_str:
+      r = time_startend_def.match(date_str)
+      if r:
+         start = parse_date(r.group(1))
+         end   = parse_date(r.group(3))
 
    return start, end
 
