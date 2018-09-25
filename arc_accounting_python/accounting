@@ -19,14 +19,14 @@ from tabulate import tabulate
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
-parser.add_argument('--date', action='store', type=str)
-parser.add_argument('--skipqueues', action='append', type=str)
-parser.add_argument('--queues', action='append', type=str)
-parser.add_argument('--owners', action='append', type=str)
-parser.add_argument('--skipowners', action='append', type=str)
-parser.add_argument('--coreowners', action='store_true', default=False)
-parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize)
-parser.add_argument('--accountingfile', action='append', type=str)
+parser.add_argument('--date', action='store', type=str, help="Date range to report on, e.g. 20180101-20180201")
+parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
+parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
+parser.add_argument('--owners', action='append', type=str, help="Equipment owner to report on")
+parser.add_argument('--skipowners', action='append', type=str, help="Equipment owner to filter out")
+parser.add_argument('--coreowners', action='store_true', default=False, help="Report on core set of equipment owners")
+parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
+parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 
 args = parser.parse_args()
 
