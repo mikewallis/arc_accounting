@@ -56,9 +56,8 @@ def main():
    # Parse date argument
    start_time, end_time = parse_startend(args.date)
 
-   users = {}
+   # Collect raw data, split by owner
    owners = {}
-
    for accounting in args.accountingfile:
       for record in sge.records(accounting=accounting):
          if record['end_time'] >= start_time and record['start_time'] < end_time:
@@ -80,9 +79,6 @@ def main():
                if args.owners and owner not in args.owners: continue
 
                # - init data
-               if user not in users:
-                  users[user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
-
                if owner not in owners:
                   owners[owner] = {}
 
@@ -90,21 +86,25 @@ def main():
                   owners[owner][user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
 
                # - record usage
-               users[user]['jobs'] += 1
                owners[owner][user]['jobs'] += 1
 
                t = core_hours(record)
-               users[user]['time'] += t[0]
                owners[owner][user]['time'] += t[0]
-               users[user]['time_adj'] += t[1]
                owners[owner][user]['time_adj'] += t[1]
 
    # Calculate a summary for each user
-   ##DEBUG - remove duplication between users and owners in above loop
+   users = {}
+   for owner in owners:
+      for user in owners[owner]:
+         if user not in users:
+            users[user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
+
+         users[user]['jobs'] += owners[owner][user]['jobs']
+         users[user]['time'] += owners[owner][user]['time']
+         users[user]['time_adj'] += owners[owner][user]['time_adj']
 
    # Calculate a summary for each owner
    owner_summaries = {}
-
    for owner, data in owners.items():
       owner_summaries[owner] = { 'users': 0, 'jobs': 0, 'time': 0, 'time_adj': 0 }
 
