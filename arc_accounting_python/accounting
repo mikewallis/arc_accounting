@@ -131,7 +131,7 @@ def print_summary(owners, users, owner_summaries):
    print("===========\n")
 
    d = []
-   for owner, data in sorted(owner_summaries.items(), key=lambda o: o[1]['time_adj'], reverse=True):
+   for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['time_adj'], reverse=True):
       d.append([
          owner,
          float(data['users']),
@@ -149,7 +149,7 @@ def print_summary(owners, users, owner_summaries):
    h = [ 'User', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
    d = []
    count = 0
-   for user, data in sorted(users.items(), key=lambda u: u[1]['time_adj'], reverse=True):
+   for user, data in sorted(users.items(), key=lambda item: item[1]['time_adj'], reverse=True):
       count += 1
       if count > args.limitusers: break
       d.append([
@@ -168,7 +168,7 @@ def print_summary(owners, users, owner_summaries):
       print("Owner:", owner)
       d = []
       count = 0
-      for user, data in sorted(owners[owner].items(), key=lambda u: u[1]['time_adj'], reverse=True):
+      for user, data in sorted(owners[owner].items(), key=lambda item: item[1]['time_adj'], reverse=True):
          count += 1
          if count > args.limitusers: break
          d.append([
@@ -206,6 +206,8 @@ def core_hours(record):
 
    if mem_req is not None and mem_core is not None:
       time_adj *= math.ceil(mem_req / float(mem_core))
+   else:
+      print("Warning: could not extract mem details from ", record['category'], file=sys.stderr)
 
    return time, time_adj
 
@@ -226,10 +228,10 @@ def parse_date(date):
       r = datetime_def.match(date)
       if r:
          # Convert strings to integers
-         l = [ int(e) for e in r.groups() if e != None ]
+         date_def = [ int(e) for e in r.groups() if e != None ]
 
          # Return seconds since epoch
-         return int(datetime(*l).strftime('%s'))
+         return int(datetime(*date_def).strftime('%s'))
 
    return None
 
