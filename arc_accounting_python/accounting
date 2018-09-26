@@ -43,6 +43,20 @@ datetime_def = re.compile(r"^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?$")
 
 owner_def = re.compile(r"^([a-z]+_)?(\S+)")
 
+# Init parameters
+# ---------------
+
+# Backup method of determining node memory per core, in absence of
+# node_type in job record, from hostname
+backup_node_mpc = [
+   { 'regex': r"^h7s3b1[56]", 'mpc': sge.number("64G") // 24 },
+   { 'regex': r"^h[12367]s",  'mpc': sge.number("2G") },
+   { 'regex': r"^dc[1-4]s",   'mpc': sge.number("128G") // 24 },
+]
+
+# Compile regexes
+for n in backup_node_mpc:
+   n['re'] = re.compile(n['regex'])
 
 # Routines
 # --------
@@ -232,7 +246,7 @@ def core_hours(record, warnings):
    # Complicated (adjusted for large memory requests)
    time_adj = time
 
-   # - obtain memory per core
+   # - obtain node memory per core
    mem_core = None
    nt = sge.category_resource(record['category'], 'node_type')
    if nt:
@@ -240,7 +254,15 @@ def core_hours(record, warnings):
       memory = sge.number(sge.node_type(nt, 'memory'))
 
       if cores and memory:
-         mem_core = int(memory / float(cores))
+         mem_core = memory // cores
+
+   # - backup method of figuring out node memory per core
+   if not mem_core:
+      # Cycle through node name regexs for a match
+      for b in backup_node_mpc:
+         r = b['re'].match(record['hostname'])
+         if r:
+            mem_core = b['mpc']
 
    # - obtain memory request
    mem_req = sge.category_resource(record['category'], 'h_vmem')
