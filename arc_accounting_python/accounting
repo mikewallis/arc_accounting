@@ -30,7 +30,6 @@ parser.add_argument('--skipowners', action='append', type=str, help="Equipment o
 parser.add_argument('--coreowners', action='store_true', default=False, help="Report on core set of equipment owners")
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
-parser.add_argument('--warnings', action='store_true', default=False, help="Print warnings on data processing")
 
 args = parser.parse_args()
 
@@ -99,7 +98,7 @@ def main():
             # - record usage
             owners[owner][user]['jobs'] += 1
 
-            t = core_hours(record, args.warnings)
+            t = core_hours(record)
             owners[owner][user]['time'] += t[0]
             owners[owner][user]['time_adj'] += t[1]
 
@@ -239,7 +238,7 @@ def percent(num):
 
 
 # Calculate the number of core hours used by a job
-def core_hours(record, warnings):
+def core_hours(record):
    # Simple (wallclock times cores)
    time = record['ru_wallclock'] * record['slots']
 
@@ -271,7 +270,7 @@ def core_hours(record, warnings):
 
    if mem_req is not None and mem_core is not None:
       time_adj *= math.ceil(mem_req / float(mem_core))
-   elif warnings:
+   else:
       print("Warning: could not extract mem details from", record['category'], file=sys.stderr)
 
    return time, time_adj
