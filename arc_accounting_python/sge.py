@@ -71,7 +71,7 @@ host_def = re.compile(r"""
 
 host_prune = re.compile(r"[^.]+")
 
-number_suffix_def = re.compile(r"^(\d+)(\D+)$")
+number_suffix_def = re.compile(r"^([0-9.]+)(\D+)$")
 number_time_def   = re.compile(r"^(\d+):(\d+):(\d+)$")
 
 node_type_def = re.compile(r"""
@@ -174,10 +174,10 @@ def number(num):
    r = number_suffix_def.match(str(num))
    if r:
       for e in enumerate(["K", "M", "G", "T"], start=1):
-         if e[1] == r.group(2): return int(r.group(1))*1024**int(e[0])
+         if e[1] == r.group(2): return int(float(r.group(1))*1024**int(e[0]))
 
       for e in enumerate(["k", "m", "g", "t"], start=1):
-         if e[1] == r.group(2): return int(r.group(1))*1000**int(e[0])
+         if e[1] == r.group(2): return int(float(r.group(1))*1000**int(e[0]))
 
    # Time to expand?
    r = number_time_def.match(str(num))
