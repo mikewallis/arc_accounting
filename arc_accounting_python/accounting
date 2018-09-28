@@ -45,17 +45,75 @@ owner_def = re.compile(r"^([a-z]+_)?(\S+)")
 # Init parameters
 # ---------------
 
-# Backup method of determining node memory per core, in absence of
+# Backup method of determining node memory per core (mpc), in absence of
 # node_type in job record, from hostname
 backup_node_mpc = [
    { 'regex': r"^h7s3b1[56]", 'mpc': sge.number("64G") // 24 },
-   { 'regex': r"^h[12367]s",  'mpc': sge.number("2G") },
+   { 'regex': r"^h[12367]s",  'mpc': sge.number("24G") // 12 },
    { 'regex': r"^dc[1-4]s",   'mpc': sge.number("128G") // 24 },
+   { 'regex': r"^c2s0b[0-3]n",'mpc': sge.number("24G") // 8 },
+   { 'regex': r"^c[1-3]s",    'mpc': sge.number("12G") // 8 },
+   { 'regex': r"^smp[1-4]",   'mpc': sge.number("128G") // 16 },
 ]
 
 # Compile regexes
 for n in backup_node_mpc:
    n['re'] = re.compile(n['regex'])
+
+# ARC1 accounting file needs a different method to distinguish
+# equipment owners beyond the core owners
+queue_owner_mapping = {
+   'env1_sgpc.q': 'sgpc',
+   'env1_glomap.q': 'glomap',
+   'speme1.q': 'speme',
+   'env1_neiss.q': 'neiss',
+   'env1_tomcat.q': 'tomcat',
+   'chem1.q': 'chem',
+   'civ1.q': 'civil',
+   'mhd1.q': 'mhd',
+}
+
+# Parent of owner mapping (e.g. mapping to core purchasers)
+owner_parent_mapping = {
+   'ENV': 'ENV',
+   'ENG': 'ENG',
+   'MAPS': 'MAPS',
+   'FBS': 'FBS',
+   'ARC': 'ARC',
+   'Arts': 'Arts',
+   'LUBS': 'LUBS',
+   'ESSL': 'ESSL',
+   'PVAC': 'PVAC',
+   'MEDH': 'MEDH',
+
+   'minphys': 'ENV',
+   'glocat': 'ENV',
+   'glomap': 'ENV',
+   'tomcat': 'ENV',
+   'palaeo1': 'ENV',
+   'sgpc': 'ENV',
+   'neiss': 'ENV',
+
+   'speme': 'ENG',
+   'civil': 'ENG',
+
+   'mhd': 'MAPS',
+   'skyblue': 'MAPS',
+   'chem': 'MAPS',
+   'maths': 'MAPS',
+   'astro': 'MAPS',
+   'codita': 'MAPS',
+
+   'omics': 'FBS',
+   'cryoem': 'FBS',
+}
+
+# Some owners have changed names, or combined with other
+# owners over the years.
+owner_owner_mapping = {
+   'ISS': 'ARC',
+   'UKMHD': 'MAPS',
+}
 
 # Routines
 # --------
@@ -83,6 +141,14 @@ def main():
          r = owner_def.match(record['project'])
          if r:
             owner = r.group(2)
+
+            # - queue to owner mapping
+            if record['qname'] in queue_owner_mapping:
+               owner = queue_owner_mapping[record['qname']]
+
+            # - owner to owner mapping (name changes, mergers, etc.)
+            if owner in owner_owner_mapping:
+               owner = owner_owner_mapping[owner]
 
             # - owner filtering
             if args.skipowners and owner in args.skipowners: continue
@@ -145,7 +211,7 @@ def print_summary(owners, users, owner_summaries):
    # - make divisions behave the same on python2
    # - tabulate only provides the option to separate thousands for floats
 
-   h = [ 'Owner', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
+   h = [ 'Owner', 'Parent', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
 
    print("===========")
    print("Top owners:")
@@ -155,6 +221,7 @@ def print_summary(owners, users, owner_summaries):
    for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['time_adj'], reverse=True):
       d.append([
          owner,
+         owner_parent_mapping.get(owner, '<unknown>'),
          float(data['users']),
          float(data['jobs']),
          float(round(data['time'] / float(3600))),
@@ -271,7 +338,7 @@ def core_hours(record):
    if mem_req is not None and mem_core is not None:
       time_adj *= math.ceil(mem_req / float(mem_core))
    else:
-      print("Warning: could not extract mem details from", record['category'], file=sys.stderr)
+      print("Warning: could not extract mem or mem per node details for", record['name'],"("+record['category']+")", file=sys.stderr)
 
    return time, time_adj
 
