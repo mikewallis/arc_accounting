@@ -102,6 +102,7 @@ def records(accounting = os.environ["SGE_ROOT"] +
                         os.environ["SGE_CELL"] +
                         "/common/accounting",
             filter = None,
+            modify = None,
           ):
    for line in open_file(accounting):
       r = record_def.match(line)
@@ -157,6 +158,9 @@ def records(accounting = os.environ["SGE_ROOT"] +
                      'maxvmem',
                   ]:
             d[f] = float(d[f])
+
+         # Modify record, e.g. add extra fields
+         if modify: modify(d)
 
          # Filter out undesirable records
          if filter:
