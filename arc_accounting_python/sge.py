@@ -82,6 +82,18 @@ node_type_def = re.compile(r"""
 """, re.VERBOSE)
 
 
+# Try to detect any compression and open appropriately
+def open_file(file):
+   if file.endswith('.gz'):
+      import gzip
+      return gzip.open(file, 'r')
+   elif file.endswith('.bz2'):
+      import bz2
+      return bz2.BZ2File(file, 'r')
+   else:
+      return open(file, 'r')
+
+
 # Generator
 # Walks all accounting records, returning a dictionary per record
 # Allows retrieval of all records, or just one at a time.
@@ -91,7 +103,7 @@ def records(accounting = os.environ["SGE_ROOT"] +
                         "/common/accounting",
             filter = None,
           ):
-   for line in open(accounting):
+   for line in open_file(accounting):
       r = record_def.match(line)
       if r:
          d = r.groupdict()
@@ -170,21 +182,24 @@ def allocs(allocs = "/var/log/local2"):
 # Expand a number potentially using gridengine numeric suffixes to a
 # simple integer
 def number(num):
-   # Suffix to expand?
-   r = number_suffix_def.match(str(num))
-   if r:
-      for e in enumerate(["K", "M", "G", "T"], start=1):
-         if e[1] == r.group(2): return int(float(r.group(1))*1024**int(e[0]))
+   if num:
+      # Suffix to expand?
+      r = number_suffix_def.match(str(num))
+      if r:
+         for e in enumerate(["K", "M", "G", "T"], start=1):
+            if e[1] == r.group(2): return int(float(r.group(1))*1024**int(e[0]))
 
-      for e in enumerate(["k", "m", "g", "t"], start=1):
-         if e[1] == r.group(2): return int(float(r.group(1))*1000**int(e[0]))
+         for e in enumerate(["k", "m", "g", "t"], start=1):
+            if e[1] == r.group(2): return int(float(r.group(1))*1000**int(e[0]))
 
-   # Time to expand?
-   r = number_time_def.match(str(num))
-   if r:
-      return int(r.group(1))*3600 + int(r.group(2))*60 + int(r.group(3))
+      # Time to expand?
+      r = number_time_def.match(str(num))
+      if r:
+         return int(r.group(1))*3600 + int(r.group(2))*60 + int(r.group(3))
 
-   return int(num)
+      return int(num)
+
+   return None
 
 #DEBUG - not working yet. Will simplify an integer using gridengine
 # size suffixes.
