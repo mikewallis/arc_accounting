@@ -132,42 +132,26 @@ def main():
    global start_time, end_time
    start_time, end_time = parse_startend(args.date)
 
-   # Collect raw data, split by owner
+   # Collect raw data, split by equipment owner
    owners = {}
    for accounting in args.accountingfile:
-      for record in sge.records(accounting=accounting, filter=record_filter):
+      for record in sge.records(accounting=accounting, modify=record_modify, filter=record_filter):
          user = record['owner'] # (refers to job owner here, not equipment owner)
+         owner = record['equip_owner'] # (refers to the equipment owner)
 
-         # - Collect data per equipment owner
-         r = owner_def.match(record['project'])
-         if r:
-            owner = r.group(2)
+         # - init data
+         if owner not in owners:
+            owners[owner] = {}
 
-            # - queue to owner mapping
-            if record['qname'] in queue_owner_mapping:
-               owner = queue_owner_mapping[record['qname']]
+         if user not in owners[owner]:
+            owners[owner][user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
 
-            # - owner to owner mapping (name changes, mergers, etc.)
-            if owner in owner_owner_mapping:
-               owner = owner_owner_mapping[owner]
+         # - record usage
+         owners[owner][user]['jobs'] += 1
 
-            # - owner filtering
-            if args.skipowners and owner in args.skipowners: continue
-            if args.owners and owner not in args.owners: continue
-
-            # - init data
-            if owner not in owners:
-               owners[owner] = {}
-
-            if user not in owners[owner]:
-               owners[owner][user] = { 'jobs': 0, 'time': 0, 'time_adj': 0 }
-
-            # - record usage
-            owners[owner][user]['jobs'] += 1
-
-            t = core_hours(record)
-            owners[owner][user]['time'] += t[0]
-            owners[owner][user]['time_adj'] += t[1]
+         t = core_hours(record)
+         owners[owner][user]['time'] += t[0]
+         owners[owner][user]['time_adj'] += t[1]
 
    # Calculate a summary for each user
    users = {}
@@ -203,7 +187,30 @@ def record_filter(record):
    if args.skipqueues and record['qname'] in args.skipqueues: return False
    if args.queues and record['qname'] not in args.queues: return False
 
+   # - Owner filtering
+   if args.skipowners and record['equip_owner'] in args.skipowners: return False
+   if args.owners and record['equip_owner'] not in args.owners: return False
+
    return True
+
+
+def record_modify(record):
+   # - Add record equipment owner in record
+   r = owner_def.match(record['project'])
+   if r:
+      owner = r.group(2)
+
+      # - queue to owner mapping
+      if record['qname'] in queue_owner_mapping:
+         owner = queue_owner_mapping[record['qname']]
+
+      # - owner to owner mapping (name changes, mergers, etc.)
+      if owner in owner_owner_mapping:
+         owner = owner_owner_mapping[owner]
+   else:
+      owner = '<unknown>'
+
+   record['equip_owner'] = owner
 
 
 def print_summary(owners, users, owner_summaries):
