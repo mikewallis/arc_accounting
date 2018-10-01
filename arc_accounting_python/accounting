@@ -17,6 +17,7 @@ import sge
 
 from datetime import datetime
 from tabulate import tabulate
+from functools import reduce
 
 # Command line arguments
 # ----------------------
@@ -211,11 +212,13 @@ def print_summary(owners, users, owner_summaries):
    # - make divisions behave the same on python2
    # - tabulate only provides the option to separate thousands for floats
 
-   h = [ 'Owner', 'Parent', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
+   h = [ 'Owner', 'Parent', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)', 'Percent' ]
 
    print("===========")
    print("Top owners:")
    print("===========\n")
+
+   time_adj = reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0)
 
    d = []
    for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['time_adj'], reverse=True):
@@ -226,7 +229,18 @@ def print_summary(owners, users, owner_summaries):
          float(data['jobs']),
          float(round(data['time'] / float(3600))),
          float(round(data['time_adj'] / float(3600))),
+         percent(data['time_adj'] / time_adj),
       ])
+
+   d.append([
+      'TOTALS',
+      '',
+      '',
+      float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
+      float(reduce((lambda x, k: x + owner_summaries[k]['time']), owner_summaries, 0) / float(3600)),
+      float(reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0) / float(3600)),
+      '',
+   ])
 
    print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
 
