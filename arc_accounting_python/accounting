@@ -49,12 +49,16 @@ owner_def = re.compile(r"^([a-z]+_)?(\S+)")
 # Backup method of determining node memory per core (mpc), in absence of
 # node_type in job record, from hostname
 backup_node_mpc = [
-   { 'regex': r"^h7s3b1[56]", 'mpc': sge.number("64G") // 24 },
-   { 'regex': r"^h[12367]s",  'mpc': sge.number("24G") // 12 },
-   { 'regex': r"^dc[1-4]s",   'mpc': sge.number("128G") // 24 },
-   { 'regex': r"^c2s0b[0-3]n",'mpc': sge.number("24G") // 8 },
-   { 'regex': r"^c[1-3]s",    'mpc': sge.number("12G") // 8 },
-   { 'regex': r"^smp[1-4]",   'mpc': sge.number("128G") // 16 },
+   { 'regex': r"^h7s3b1[56]", 'mpc': sge.number("64G") // 24 }, # ARC2
+   { 'regex': r"^h[12367]s",  'mpc': sge.number("24G") // 12 }, # ARC2
+   { 'regex': r"^dc[1-4]s",   'mpc': sge.number("128G") // 24 }, # ARC3
+   { 'regex': r"^c2s0b[0-3]n",'mpc': sge.number("24G") // 8 }, # ARC1
+   { 'regex': r"^c[1-3]s",    'mpc': sge.number("12G") // 8 }, # ARC1
+   { 'regex': r"^smp[1-4]",   'mpc': sge.number("128G") // 16 }, # ARC1
+   { 'regex': r"^g8s([789]|10)n", 'mpc': sge.number("256G") // 16 }, # POLARIS
+   { 'regex': r"^g[0-9]s",    'mpc': sge.number("64G") // 16 }, # POLARIS/ARC2
+   { 'regex': r"^hb01s",      'mpc': sge.number("256G") // 20 }, # MARC1
+   { 'regex': r"^hb02n",      'mpc': sge.number("3T") // 48 }, # MARC1
 ]
 
 # Compile regexes
