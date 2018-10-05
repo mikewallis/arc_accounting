@@ -6,15 +6,16 @@ reports on gridengine accounting data
 
 Mostly tested under python3, but should work under python2.
 
-You may need to install package 'tabulate':
+You may need to install following packages:
 
    pip install --user tabulate
+   pip install --user python-dateutil
 
 Example usage to report on combined arc3 and arc2 usage (copy each
 service's accounting file to an appropriate location first):
 
    ./accounting \
-      --date 20170101-20180101 \
+      --date 201801-201805 \
       --coreowners --limitusers 10 \
       --accountingfile=/tmp/issmcd/accounting_arc3 \
       --accountingfile=/tmp/issmcd/accounting_arc2

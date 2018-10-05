@@ -14,16 +14,18 @@ import re
 import sys
 import math
 import sge
+import datetime
+import time
 
-from datetime import datetime
 from tabulate import tabulate
 from functools import reduce
+from dateutil.relativedelta import relativedelta
 
 # Command line arguments
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
-parser.add_argument('--date', action='store', type=str, help="Date range to report on, e.g. 20180101-20180201")
+parser.add_argument('--date', action='store', type=str, help="Date range to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
 parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
 parser.add_argument('--owners', action='append', type=str, help="Equipment owner to report on")
@@ -37,7 +39,7 @@ args = parser.parse_args()
 # Prepare regexes
 # ---------------
 
-time_startend_def = re.compile(r"^(\d+)(-(\d+))?$")
+time_startend_def = re.compile(r"^(\d+)?(-(\d+)?)?$")
 
 datetime_def = re.compile(r"^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?$")
 
@@ -45,6 +47,9 @@ owner_def = re.compile(r"^([a-z]+_)?(\S+)")
 
 # Init parameters
 # ---------------
+
+# Maximum date to report on (YYYY[MM[DD[HH[MM[SS]]]]])
+max_date = "40000101"
 
 # Backup method of determining node memory per core (mpc), in absence of
 # node_type in job record, from hostname
@@ -219,6 +224,11 @@ def record_modify(record):
 
 def print_summary(owners, users, owner_summaries):
 
+   print("Accounting summary, reporting on jobs ending in the range:")
+   print(" Start:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(start_time)))
+   print(" End:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(end_time)))
+   print("")
+
    # Note: lots of promoting ints to floats for two reasons:
    # - make divisions behave the same on python2
    # - tabulate only provides the option to separate thousands for floats
@@ -368,29 +378,82 @@ def core_hours(record):
    return time, time_adj
 
 
+# Take a date range string of format [DATE][-[DATE]], where DATE has format
+# YYYY[MM[DD[HH[MM[SS]]]]], and return a tuple with the seconds since the
+# epoch bounding the start and end of that range (start - inclusive,
+# end - exclusive).
 def parse_startend(date_str):
-   start, end = 0, sys.maxsize
+   start = 0
+   end = int(datetime.datetime(
+      *parse_date(max_date),
+      tzinfo=datetime.timezone.utc,
+   ).strftime('%s'))
 
    if date_str:
       r = time_startend_def.match(date_str)
       if r:
-         start = parse_date(r.group(1))
-         end   = parse_date(r.group(3))
+         if r.group(1):
+            start_dt = datetime.datetime(
+               *datetime_defaults(*parse_date(r.group(1))),
+               tzinfo=datetime.timezone.utc,
+            )
+
+            start = int(start_dt.strftime('%s'))
+
+         end_dt = next_datetime(
+            *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
+            tzinfo=datetime.timezone.utc,
+         )
+
+         end   = int(end_dt.strftime('%s'))
 
    return start, end
 
 
+# Take a date/time string with optional components of format
+# YYYY[MM[DD[HH[MM[SS]]]]] and return that information split into a tuple
+# as integers
 def parse_date(date):
    if date:
       r = datetime_def.match(date)
       if r:
-         # Convert strings to integers
-         date_def = [ int(e) for e in r.groups() if e != None ]
-
-         # Return seconds since epoch
-         return int(datetime(*date_def).strftime('%s'))
+         # Convert strings to integers - don't initialise anything we don't
+         # have information for.
+         return ( int(e) for e in r.groups() if e != None )
 
    return None
+
+
+# Takes similar arguments as datetime, returns a datetime
+# object "1" louder, e.g. if args specify a particular month,
+# will return the next month in the same year.
+def next_datetime(*date_time, tzinfo=datetime.timezone.utc):
+   t1 = datetime.datetime(*datetime_defaults(*date_time), tzinfo=tzinfo)
+
+   case = {
+      1: t1 + relativedelta(years=1),
+      2: t1 + relativedelta(months=1),
+      3: t1 + datetime.timedelta(days=1),
+      4: t1 + datetime.timedelta(hours=1),
+      5: t1 + datetime.timedelta(minutes=1),
+      6: t1 + datetime.timedelta(seconds=1),
+   }
+
+   return case.get(len(date_time))
+
+
+# Takes a list/tuple of datetime arguments (year, month, etc.), filling
+# out with the minimum defaults assuming we're interested in the start
+# of a month, year, or the Unix epoch.
+def datetime_defaults(*date_time):
+   t = list(date_time)
+
+   # datetime needs some minimum information - apply defaults to any missing
+   if len(t) < 1: t.append(1970) # year
+   if len(t) < 2: t.append(1) # month
+   if len(t) < 3: t.append(1) # day
+
+   return tuple(t)
 
 
 # Run program
