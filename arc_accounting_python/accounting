@@ -34,6 +34,7 @@ parser.add_argument('--skipowners', action='append', type=str, help="Equipment o
 parser.add_argument('--coreowners', action='store_true', default=False, help="Report on core set of equipment owners")
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
+parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to report utilisation on")
 
 args = parser.parse_args()
 
@@ -186,7 +187,7 @@ def main():
          owner_summaries[owner]['time_adj'] += user['time_adj']
 
    # Spit out answer
-   print_summary(owners, users, owner_summaries)
+   print_summary(owners, users, owner_summaries, args.cores)
 
 
 def record_filter(record):
@@ -223,25 +224,31 @@ def record_modify(record):
    record['equip_owner'] = owner
 
 
-def print_summary(owners, users, owner_summaries):
+def print_summary(owners, users, owner_summaries, total_cores):
 
    print("Accounting summary, reporting on jobs ending in the range:")
    print(" Start:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(start_time)))
    print(" End:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(end_time)))
-   print(" Duration:", (end_time - start_time)//3600, "hours")
+   print(" Duration:", (end_time - start_time)//3600, "hours", "Cores:", total_cores)
    print("")
 
    # Note: lots of promoting ints to floats for two reasons:
    # - make divisions behave the same on python2
    # - tabulate only provides the option to separate thousands for floats
 
-   h = [ 'Owner', 'Parent', 'Active Users', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)', 'Percent' ]
+   h = [ 'Owner', 'Parent', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usage', '%Util' ]
 
    print("===========")
    print("Top owners:")
    print("===========\n")
 
    time_adj = reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0)
+
+   ##DEBUG - figure out what to do here when range is for all time
+   if total_cores:
+      inv_total_time = 1/float((end_time - start_time)* total_cores)
+   else:
+      inv_total_time = 0
 
    d = []
    for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['time_adj'], reverse=True):
@@ -253,6 +260,7 @@ def print_summary(owners, users, owner_summaries):
          float(round(data['time'] / float(3600))),
          float(round(data['time_adj'] / float(3600))),
          percent(data['time_adj'] / time_adj),
+         percent(data['time_adj'] * inv_total_time),
       ])
 
    d.append([
@@ -262,7 +270,8 @@ def print_summary(owners, users, owner_summaries):
       float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
       float(reduce((lambda x, k: x + owner_summaries[k]['time']), owner_summaries, 0) / float(3600)),
       float(reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0) / float(3600)),
-      '',
+      percent(reduce((lambda x, k: x + owner_summaries[k]['time_adj'] / time_adj), owner_summaries, 0)),
+      percent(reduce((lambda x, k: x + owner_summaries[k]['time_adj'] * inv_total_time), owner_summaries, 0)),
    ])
 
    print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
@@ -273,7 +282,7 @@ def print_summary(owners, users, owner_summaries):
 
    print_simplestats(users, args.limitusers)
 
-   h = [ 'User', 'Jobs', 'Time (core hours)', 'Adjusted Time (core hours)' ]
+   h = [ 'User', 'Jobs', 'Core Hrs', 'Adj Core Hrs' ]
    d = []
    count = 0
    for user, data in sorted(users.items(), key=lambda item: item[1]['time_adj'], reverse=True):
@@ -338,7 +347,7 @@ def print_simplestats(data, top_n):
 
 
 def percent(num):
-   return "{0:.0%}".format(float(num))
+   return "{0:.1%}".format(float(num))
 
 
 # Calculate the number of core hours used by a job
