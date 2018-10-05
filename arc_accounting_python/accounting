@@ -228,6 +228,7 @@ def print_summary(owners, users, owner_summaries):
    print("Accounting summary, reporting on jobs ending in the range:")
    print(" Start:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(start_time)))
    print(" End:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(end_time)))
+   print(" Duration:", (end_time - start_time)//3600, "hours")
    print("")
 
    # Note: lots of promoting ints to floats for two reasons:
