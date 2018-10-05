@@ -16,6 +16,7 @@ import math
 import sge
 import datetime
 import time
+import pytz
 
 from tabulate import tabulate
 from functools import reduce
@@ -25,7 +26,7 @@ from dateutil.relativedelta import relativedelta
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
-parser.add_argument('--date', action='store', type=str, help="Date range to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
+parser.add_argument('--date', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
 parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
 parser.add_argument('--owners', action='append', type=str, help="Equipment owner to report on")
@@ -386,7 +387,7 @@ def parse_startend(date_str):
    start = 0
    end = int(datetime.datetime(
       *parse_date(max_date),
-      tzinfo=datetime.timezone.utc,
+      tzinfo=pytz.timezone('UTC'),
    ).strftime('%s'))
 
    if date_str:
@@ -395,14 +396,14 @@ def parse_startend(date_str):
          if r.group(1):
             start_dt = datetime.datetime(
                *datetime_defaults(*parse_date(r.group(1))),
-               tzinfo=datetime.timezone.utc,
+               tzinfo=pytz.timezone('UTC'),
             )
 
             start = int(start_dt.strftime('%s'))
 
          end_dt = next_datetime(
             *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
-            tzinfo=datetime.timezone.utc,
+            tzinfo=pytz.timezone('UTC'),
          )
 
          end   = int(end_dt.strftime('%s'))
@@ -427,7 +428,7 @@ def parse_date(date):
 # Takes similar arguments as datetime, returns a datetime
 # object "1" louder, e.g. if args specify a particular month,
 # will return the next month in the same year.
-def next_datetime(*date_time, tzinfo=datetime.timezone.utc):
+def next_datetime(*date_time, tzinfo=pytz.timezone('UTC')):
    t1 = datetime.datetime(*datetime_defaults(*date_time), tzinfo=tzinfo)
 
    case = {
