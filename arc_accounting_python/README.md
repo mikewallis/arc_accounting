@@ -10,6 +10,7 @@ You may need to install following packages:
 
    pip install --user tabulate
    pip install --user python-dateutil
+   pip install --user pytz
 
 Example usage to report on combined arc3 and arc2 usage (copy each
 service's accounting file to an appropriate location first):
@@ -21,3 +22,9 @@ service's accounting file to an appropriate location first):
       --accountingfile=/tmp/issmcd/accounting_arc2
 
 See "./accounting --help" for more details. All arguments are optional.
+
+Alternatively, program can be imported into an interactive python session:
+
+    import accounting as ac
+    print(ac.args)
+    ac.main()
