@@ -272,7 +272,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
 
       d.append([
          'TOTALS',
-         '',
+         '-',
          float(len(users)), # Note: unique users - not the sum of entries in column
          float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
          float(reduce((lambda x, k: x + owner_summaries[k]['time']), owner_summaries, 0) / float(3600)),
@@ -308,7 +308,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
 
       d.append([
          'TOTALS',
-         '',
+         '-',
          float(reduce((lambda x, k: x + users[k]['jobs']), users, 0)),
          float(reduce((lambda x, k: x + users[k]['time']), users, 0) / float(3600)),
          float(reduce((lambda x, k: x + users[k]['time_adj']), users, 0) / float(3600)),
