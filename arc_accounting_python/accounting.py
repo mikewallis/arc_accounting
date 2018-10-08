@@ -142,7 +142,7 @@ def main():
 
    # All reports, if not specified
    if not args.reports:
-      args.reports = [ 'header', 'owners', 'users', 'usersbyowner' ]
+      args.reports = [ 'header', 'totals', 'owners', 'users', 'usersbyowner' ]
 
    # Parse date argument
    global start_time, end_time
@@ -249,6 +249,25 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
       inv_total_time = 0
 
    time_adj = reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0)
+
+   if 'totals' in reports:
+      print("=======")
+      print("Totals:")
+      print("=======\n")
+
+      h = [ 'Owners', 'Uniq Usrs', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Utl' ]
+      d = [
+         [
+            float(len(owner_summaries)),
+            float(len(users)),
+            float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
+            float(reduce((lambda x, k: x + owner_summaries[k]['time']), owner_summaries, 0) / float(3600)),
+            float(reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0) / float(3600)),
+            percent(reduce((lambda x, k: x + owner_summaries[k]['time_adj'] * inv_total_time), owner_summaries, 0)),
+         ],
+      ]
+
+      print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
 
    if 'owners' in reports:
       h = [ 'Owner', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg', '%Utl' ]
