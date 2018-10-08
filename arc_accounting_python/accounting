@@ -251,7 +251,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
    time_adj = reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0)
 
    if 'owners' in reports:
-      h = [ 'Owner', 'Parent', 'Users', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usage', '%Util' ]
+      h = [ 'Owner', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg', '%Utl' ]
 
       print("===========")
       print("Top owners:")
@@ -273,7 +273,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
       d.append([
          'TOTALS',
          '',
-         '',
+         float(len(users)), # Note: unique users - not the sum of entries in column
          float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
          float(reduce((lambda x, k: x + owner_summaries[k]['time']), owner_summaries, 0) / float(3600)),
          float(reduce((lambda x, k: x + owner_summaries[k]['time_adj']), owner_summaries, 0) / float(3600)),
@@ -290,7 +290,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
 
       print_simplestats(users, args.limitusers)
 
-      h = [ 'User', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usage', '%Util' ]
+      h = [ 'Usr', 'Owner(s)', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg', '%Utl' ]
       d = []
       count = 0
       for user, data in sorted(users.items(), key=lambda item: item[1]['time_adj'], reverse=True):
@@ -298,6 +298,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
          if count > args.limitusers: break
          d.append([
             user,
+            ",".join(sorted([o  for o in owners for u in owners[o] if u == user])),
             float(data['jobs']),
             float(round(data['time'] / float(3600))),
             float(round(data['time_adj'] / float(3600))),
@@ -307,6 +308,7 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
 
       d.append([
          'TOTALS',
+         '',
          float(reduce((lambda x, k: x + users[k]['jobs']), users, 0)),
          float(reduce((lambda x, k: x + users[k]['time']), users, 0) / float(3600)),
          float(reduce((lambda x, k: x + users[k]['time_adj']), users, 0) / float(3600)),
@@ -320,6 +322,9 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
       print("===================")
       print("Top users by owner:")
       print("===================\n")
+
+      h = [ 'Usr', 'Jobs', 'Core Hrs', 'Adj Core Hrs', '%Usg', '%Utl' ]
+
       for owner in sorted(owners):
          time_adj = reduce((lambda x, k: x + owners[owner][k]['time_adj']), owners[owner], 0)
 
