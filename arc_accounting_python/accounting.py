@@ -275,6 +275,140 @@ def return_size_adj(record):
 
    return size_adj
 
+def summarise_totals(owners, users, owner_summaries, inv_total_time):
+   h = [ 'Owners', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+   d = [
+      {
+         'Owners': len(owner_summaries),
+         'Uniq Usrs': len(users),
+         'Jobs': reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0),
+         'Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0),
+         '%Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
+         'Adj Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0),
+         'Adj %Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
+      },
+   ]
+   t = None
+
+   return h, d, t
+
+def summarise_owners(owners, users, owner_summaries, inv_total_time, core_hours_adj):
+   h = [ 'Owner', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+
+   d = []
+   for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+      d.append({
+         'Owner': owner,
+         'Parent': owner_parent_mapping.get(owner, '<unknown>'),
+         'Uniq Usrs': data['users'],
+         'Jobs': data['jobs'],
+         'Core Hrs': round(data['core_hours']),
+         '%Utl': percent(data['core_hours'] * inv_total_time),
+         'Adj Core Hrs': round(data['core_hours_adj']),
+         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
+         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
+      })
+
+   t = {
+      'Owner': 'TOTALS',
+      'Parent': '-',
+      'Uniq Usrs': len(users), # Note: unique users - not the sum of entries in column
+      'Jobs': reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0),
+      'Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0),
+      '%Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
+      'Adj Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0),
+      'Adj %Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
+      '%Usg': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] / core_hours_adj), owner_summaries, 0)),
+   }
+
+   return h, d, t
+
+def summarise_users(owners, users, inv_total_time, core_hours_adj):
+   h = [ 'Usr', 'Owner(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+
+   d = []
+   count = 0
+   for user, data in sorted(users.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+      count += 1
+      if count > args.limitusers: break
+      d.append({
+         'Usr': user,
+         'Owner(s)': ",".join(sorted([o  for o in owners for u in owners[o] if u == user])),
+         'Jobs': data['jobs'],
+         'Core Hrs': round(data['core_hours']),
+         '%Utl': percent(data['core_hours'] * inv_total_time),
+         'Adj Core Hrs': round(data['core_hours_adj']),
+         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
+         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
+      })
+
+   t = {
+      'Usr': 'TOTALS',
+      'Owner(s)': '-',
+      'Jobs': reduce((lambda x, k: x + users[k]['jobs']), users, 0),
+      'Core Hrs': reduce((lambda x, k: x + users[k]['core_hours']), users, 0),
+      '%Utl': percent(reduce((lambda x, k: x + users[k]['core_hours'] * inv_total_time), users, 0)),
+      'Adj Core Hrs': reduce((lambda x, k: x + users[k]['core_hours_adj']), users, 0),
+      'Adj %Utl': percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] * inv_total_time), users, 0)),
+      '%Usg': percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] / core_hours_adj), users, 0)),
+   }
+
+   return h, d, t
+
+def summarise_owner(owner, inv_total_time, core_hours_adj):
+   h = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+
+   d = []
+   count = 0
+   for user, data in sorted(owner.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+      count += 1
+      if count > args.limitusers: break
+      d.append({
+         'Usr': user,
+         'Jobs': data['jobs'],
+         'Core Hrs': round(data['core_hours']),
+         '%Utl': percent(data['core_hours'] * inv_total_time),
+         'Adj Core Hrs': round(data['core_hours_adj']),
+         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
+         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
+      })
+
+   t = {
+      'Usr': 'TOTALS',
+      'Jobs': reduce((lambda x, k: x + owner[k]['jobs']), owner, 0),
+      'Core Hrs': reduce((lambda x, k: x + owner[k]['core_hours']), owner, 0),
+      '%Utl': percent(reduce((lambda x, k: x + owner[k]['core_hours'] * inv_total_time), owner, 0)),
+      'Adj Core Hrs': reduce((lambda x, k: x + owner[k]['core_hours_adj']), owner, 0),
+      'Adj %Utl': percent(reduce((lambda x, k: x + owner[k]['core_hours_adj'] * inv_total_time), owner, 0)),
+      '%Usg': percent(reduce((lambda x, k: x + owner[k]['core_hours_adj'] / core_hours_adj), owner, 0)),
+   }
+
+   return h, d, t
+
+def print_table(headers, data, totals):
+
+   if len(headers) != len(set(headers)):
+      print("ERROR: cannot have multiple columns with same name", headers)
+
+   # Construct data for table
+   tab_data = []
+   for d in data:
+      tab_data.append([d[column] for column in headers])
+
+   if totals:
+      tab_data.append([totals[column] for column in headers])
+
+   # Attempt to promote all elements in table to floats,
+   # in order to show thousands separator
+   for row in tab_data:
+      for (column, value) in enumerate(row):
+         try:
+            row[column] = float(value)
+         except:
+            None
+
+   print(tabulate(tab_data, headers=headers, floatfmt=",.0f"),"\n")
+
 def print_summary(owners, users, owner_summaries, total_cores, reports):
 
    if 'header' in reports:
@@ -300,132 +434,32 @@ def print_summary(owners, users, owner_summaries, total_cores, reports):
       print("=======")
       print("Totals:")
       print("=======\n")
-
-      h = [ 'Owners', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', '%Utl' ]
-      d = [
-         [
-            float(len(owner_summaries)),
-            float(len(users)),
-            float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
-            float(reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0)),
-            percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
-            float(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0)),
-            percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
-         ],
-      ]
-
-      print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+      print_table(*summarise_totals(owners, users, owner_summaries, inv_total_time))
 
    if 'owners' in reports:
-      h = [ 'Owner', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', '%Utl', '%Usg' ]
-
       print("===========")
       print("Top owners:")
       print("===========\n")
-
-      d = []
-      for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
-         d.append([
-            owner,
-            owner_parent_mapping.get(owner, '<unknown>'),
-            float(data['users']),
-            float(data['jobs']),
-            float(round(data['core_hours'])),
-            percent(data['core_hours'] * inv_total_time),
-            float(round(data['core_hours_adj'])),
-            percent(data['core_hours_adj'] * inv_total_time),
-            percent(data['core_hours_adj'] / core_hours_adj),
-         ])
-
-      d.append([
-         'TOTALS',
-         '-',
-         float(len(users)), # Note: unique users - not the sum of entries in column
-         float(reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0)),
-         float(reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0)),
-         percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
-         float(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0)),
-         percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
-         percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] / core_hours_adj), owner_summaries, 0)),
-      ])
-
-      print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+      print_table(*summarise_owners(owners, users, owner_summaries, inv_total_time, core_hours_adj))
 
    if 'users' in reports:
       print("==========")
       print("Top users:")
       print("==========\n")
-
       print_simplestats(users, args.limitusers)
-
-      h = [ 'Usr', 'Owner(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', '%Utl', '%Usg' ]
-      d = []
-      count = 0
-      for user, data in sorted(users.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
-         count += 1
-         if count > args.limitusers: break
-         d.append([
-            user,
-            ",".join(sorted([o  for o in owners for u in owners[o] if u == user])),
-            float(data['jobs']),
-            float(round(data['core_hours'])),
-            percent(data['core_hours'] * inv_total_time),
-            float(round(data['core_hours_adj'])),
-            percent(data['core_hours_adj'] * inv_total_time),
-            percent(data['core_hours_adj'] / core_hours_adj),
-         ])
-
-      d.append([
-         'TOTALS',
-         '-',
-         float(reduce((lambda x, k: x + users[k]['jobs']), users, 0)),
-         float(reduce((lambda x, k: x + users[k]['core_hours']), users, 0)),
-         percent(reduce((lambda x, k: x + users[k]['core_hours'] * inv_total_time), users, 0)),
-         float(reduce((lambda x, k: x + users[k]['core_hours_adj']), users, 0)),
-         percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] * inv_total_time), users, 0)),
-         percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] / core_hours_adj), users, 0)),
-      ])
-
-      print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+      print_table(*summarise_users(owners, users, inv_total_time, core_hours_adj))
 
    if 'usersbyowner' in reports:
       print("===================")
       print("Top users by owner:")
       print("===================\n")
 
-      h = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', '%Utl', '%Usg' ]
-
       for owner in sorted(owners):
          core_hours_adj = reduce((lambda x, k: x + owners[owner][k]['core_hours_adj']), owners[owner], 0)
 
          print("Owner:", owner)
          print_simplestats(owners[owner], args.limitusers)
-         d = []
-         count = 0
-         for user, data in sorted(owners[owner].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
-            count += 1
-            if count > args.limitusers: break
-            d.append([
-               user,
-               float(data['jobs']),
-               float(round(data['core_hours'])),
-               percent(data['core_hours'] * inv_total_time),
-               float(round(data['core_hours_adj'])),
-               percent(data['core_hours_adj'] * inv_total_time),
-               percent(data['core_hours_adj'] / core_hours_adj),
-            ])
-
-         d.append([
-            'TOTALS',
-            float(reduce((lambda x, k: x + owners[owner][k]['jobs']), owners[owner], 0)),
-            float(reduce((lambda x, k: x + owners[owner][k]['core_hours']), owners[owner], 0)),
-            percent(reduce((lambda x, k: x + owners[owner][k]['core_hours'] * inv_total_time), owners[owner], 0)),
-            float(reduce((lambda x, k: x + owners[owner][k]['core_hours_adj']), owners[owner], 0)),
-            percent(reduce((lambda x, k: x + owners[owner][k]['core_hours_adj'] * inv_total_time), owners[owner], 0)),
-            percent(reduce((lambda x, k: x + owners[owner][k]['core_hours_adj'] / core_hours_adj), owners[owner], 0)),
-         ])
-
-         print(tabulate(d, headers=h, floatfmt=",.0f"),"\n")
+         print_table(*summarise_owner(owners[owner], inv_total_time, core_hours_adj))
 
 
 def print_simplestats(data, top_n):
