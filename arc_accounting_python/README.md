@@ -17,7 +17,7 @@ service's accounting file to an appropriate location first):
 
    ./accounting \
       --date 201801-201805 \
-      --coreowners --limitusers 10 \
+      --coreprojects --limitusers 10 \
       --accountingfile=/tmp/issmcd/accounting_arc3 \
       --accountingfile=/tmp/issmcd/accounting_arc2
 

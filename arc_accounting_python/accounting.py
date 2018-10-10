@@ -29,13 +29,13 @@ parser = argparse.ArgumentParser(description='Report on accounting data')
 parser.add_argument('--date', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
 parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
-parser.add_argument('--owners', action='append', type=str, help="Equipment owner to report on")
-parser.add_argument('--skipowners', action='append', type=str, help="Equipment owner to filter out")
-parser.add_argument('--coreowners', action='store_true', default=False, help="Report on core set of equipment owners")
+parser.add_argument('--projects', action='append', type=str, help="Equipment project to report on")
+parser.add_argument('--skipprojects', action='append', type=str, help="Equipment project to filter out")
+parser.add_argument('--coreprojects', action='store_true', default=False, help="Report on core set of projects")
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to report utilisation on")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, owners, users, usersbyowner)")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, projects, users, usersbyproject)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 
 args = parser.parse_args()
@@ -47,7 +47,7 @@ range_def = re.compile(r"^(\d+)?(-(\d+)?)?$")
 
 datetime_def = re.compile(r"^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?$")
 
-owner_def = re.compile(r"^([a-z]+_)?(\S+)")
+project_def = re.compile(r"^([a-z]+_)?(\S+)")
 
 # Init parameters
 # ---------------
@@ -76,8 +76,8 @@ for n in backup_node_mpc:
    n['re'] = re.compile(n['regex'])
 
 # ARC1 accounting file needs a different method to distinguish
-# equipment owners beyond the core owners
-queue_owner_mapping = {
+# equipment projects beyond the core projects
+queue_project_mapping = {
    'env1_sgpc.q': 'sgpc',
    'env1_glomap.q': 'glomap',
    'speme1.q': 'speme',
@@ -88,8 +88,8 @@ queue_owner_mapping = {
    'mhd1.q': 'mhd',
 }
 
-# Parent of owner mapping (e.g. mapping to core purchasers)
-owner_parent_mapping = {
+# Parent of project mapping (e.g. mapping to core purchasers)
+project_parent_mapping = {
    'ENV': 'ENV',
    'ENG': 'ENG',
    'MAPS': 'MAPS',
@@ -123,9 +123,9 @@ owner_parent_mapping = {
    'cryoem': 'FBS',
 }
 
-# Some owners have changed names, or combined with other
-# owners over the years.
-owner_owner_mapping = {
+# Some projects have changed names, or combined with other
+# projects over the years.
+project_project_mapping = {
    'ISS': 'ARC',
    'UKMHD': 'MAPS',
 }
@@ -135,8 +135,8 @@ owner_owner_mapping = {
 
 def main():
    # Restrict to the core purchasers of ARC, if requested
-   if args.coreowners:
-      args.owners = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
+   if args.coreprojects:
+      args.projects = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
 
    # Read default accounting file if none specified
    if not args.accountingfile:
@@ -144,7 +144,7 @@ def main():
 
    # All reports, if not specified
    if not args.reports:
-      args.reports = [ 'header', 'totals', 'owners', 'users', 'usersbyowner' ]
+      args.reports = [ 'header', 'totals', 'projects', 'users', 'usersbyproject' ]
 
    # Job size bins, if not specified
    if not args.sizebins:
@@ -159,19 +159,19 @@ def main():
    global start_time, end_time
    start_time, end_time = parse_startend(args.date)
 
-   # Collect raw data, split by equipment owner
-   owners = {}
+   # Collect raw data, split by project
+   projects = {}
    for accounting in args.accountingfile:
       for record in sge.records(accounting=accounting, modify=record_modify, filter=record_filter):
-         user = record['owner'] # (refers to job owner here, not equipment owner)
-         owner = record['equip_owner'] # (refers to the equipment owner)
+         user = record['owner']
+         project = record['equip_project'] # (refers to the equipment project)
 
          # - init data
-         if owner not in owners:
-            owners[owner] = {}
+         if project not in projects:
+            projects[project] = {}
 
-         if user not in owners[owner]:
-            owners[owner][user] = {
+         if user not in projects[project]:
+            projects[project][user] = {
                'jobs': 0,
                'core_hours': 0,
                'core_hours_adj': 0,
@@ -179,19 +179,19 @@ def main():
             }
 
          # - record usage
-         owners[owner][user]['jobs'] += 1
+         projects[project][user]['jobs'] += 1
 
-         owners[owner][user]['core_hours'] += record['core_hours']
-         owners[owner][user]['core_hours_adj'] += record['core_hours_adj']
+         projects[project][user]['core_hours'] += record['core_hours']
+         projects[project][user]['core_hours_adj'] += record['core_hours_adj']
 
          for (i, b) in enumerate(sizebins):
             if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
-               owners[owner][user]['job_size'][i] += record['core_hours_adj']
+               projects[project][user]['job_size'][i] += record['core_hours_adj']
 
    # Calculate a summary for each user
    users = {}
-   for owner in owners:
-      for user in owners[owner]:
+   for project in projects:
+      for user in projects[project]:
          if user not in users:
             users[user] = {
                'jobs': 0,
@@ -200,18 +200,18 @@ def main():
                'job_size': [0 for b in sizebins],
             }
 
-         users[user]['jobs'] += owners[owner][user]['jobs']
-         users[user]['core_hours'] += owners[owner][user]['core_hours']
-         users[user]['core_hours_adj'] += owners[owner][user]['core_hours_adj']
+         users[user]['jobs'] += projects[project][user]['jobs']
+         users[user]['core_hours'] += projects[project][user]['core_hours']
+         users[user]['core_hours_adj'] += projects[project][user]['core_hours_adj']
 
          for (i, b) in enumerate(sizebins):
-            users[user]['job_size'][i] += owners[owner][user]['job_size'][i]
+            users[user]['job_size'][i] += projects[project][user]['job_size'][i]
 
 
-   # Calculate a summary for each owner
-   owner_summaries = {}
-   for owner, data in owners.items():
-      owner_summaries[owner] = {
+   # Calculate a summary for each project
+   project_summaries = {}
+   for project, data in projects.items():
+      project_summaries[project] = {
          'users': 0,
          'jobs': 0,
          'core_hours': 0,
@@ -220,16 +220,16 @@ def main():
       }
 
       for user in data.values():
-         owner_summaries[owner]['users'] += 1
-         owner_summaries[owner]['jobs'] += user['jobs']
-         owner_summaries[owner]['core_hours'] += user['core_hours']
-         owner_summaries[owner]['core_hours_adj'] += user['core_hours_adj']
+         project_summaries[project]['users'] += 1
+         project_summaries[project]['jobs'] += user['jobs']
+         project_summaries[project]['core_hours'] += user['core_hours']
+         project_summaries[project]['core_hours_adj'] += user['core_hours_adj']
 
          for (i, b) in enumerate(sizebins):
-            owner_summaries[owner]['job_size'][i] += user['job_size'][i]
+            project_summaries[project]['job_size'][i] += user['job_size'][i]
 
    # Spit out answer
-   print_summary(owners, users, owner_summaries, args.cores, args.reports, sizebins)
+   print_summary(projects, users, project_summaries, args.cores, args.reports, sizebins)
 
 
 def record_filter(record):
@@ -240,32 +240,32 @@ def record_filter(record):
    if args.skipqueues and record['qname'] in args.skipqueues: return False
    if args.queues and record['qname'] not in args.queues: return False
 
-   # - Owner filtering
-   if args.skipowners and record['equip_owner'] in args.skipowners: return False
-   if args.owners and record['equip_owner'] not in args.owners: return False
+   # - Project filtering
+   if args.skipprojects and record['equip_project'] in args.skipprojects: return False
+   if args.projects and record['equip_project'] not in args.projects: return False
 
    return True
 
 
 def record_modify(record):
 
-   # Add record equipment owner in record
+   # Add record equipment project in record
 
-   r = owner_def.match(record['project'])
+   r = project_def.match(record['project'])
    if r:
-      owner = r.group(2)
+      project = r.group(2)
 
-      # - queue to owner mapping
-      if record['qname'] in queue_owner_mapping:
-         owner = queue_owner_mapping[record['qname']]
+      # - queue to project mapping
+      if record['qname'] in queue_project_mapping:
+         project = queue_project_mapping[record['qname']]
 
-      # - owner to owner mapping (name changes, mergers, etc.)
-      if owner in owner_owner_mapping:
-         owner = owner_owner_mapping[owner]
+      # - project to project mapping (name changes, mergers, etc.)
+      if project in project_project_mapping:
+         project = project_project_mapping[project]
    else:
-      owner = '<unknown>'
+      project = '<unknown>'
 
-   record['equip_owner'] = owner
+   record['equip_project'] = project
 
    # Add size and core hour figures
 
@@ -314,21 +314,21 @@ def return_size_adj(record):
    return size_adj
 
 
-def summarise_totals(owners, users, owner_summaries, inv_total_time, bins):
-   h = [ 'Owners', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+def summarise_totals(projects, users, project_summaries, inv_total_time, bins):
+   h = [ 'Projects', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
    if bins:
       h.extend([b['name'] for b in bins])
 
    d = [
       {
-         'Owners': len(owner_summaries),
+         'Projects': len(project_summaries),
          'Uniq Usrs': len(users),
-         'Jobs': reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0),
-         'Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0),
-         '%Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
-         'Adj Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0),
-         'Adj %Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
-         **{ b['name']: reduce((lambda x, k: x + owner_summaries[k]['job_size'][i]), owner_summaries, 0) for i, b in enumerate(bins) },
+         'Jobs': reduce((lambda x, k: x + project_summaries[k]['jobs']), project_summaries, 0),
+         'Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours']), project_summaries, 0),
+         '%Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours'] * inv_total_time), project_summaries, 0)),
+         'Adj Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0),
+         'Adj %Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] * inv_total_time), project_summaries, 0)),
+         **{ b['name']: reduce((lambda x, k: x + project_summaries[k]['job_size'][i]), project_summaries, 0) for i, b in enumerate(bins) },
       },
    ]
    t = None
@@ -336,16 +336,16 @@ def summarise_totals(owners, users, owner_summaries, inv_total_time, bins):
    return h, d, t
 
 
-def summarise_owners(owners, users, owner_summaries, inv_total_time, core_hours_adj, bins):
-   h = [ 'Owner', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+def summarise_projects(projects, users, project_summaries, inv_total_time, core_hours_adj, bins):
+   h = [ 'Project', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
       h.extend([b['name'] for b in bins])
 
    d = []
-   for owner, data in sorted(owner_summaries.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+   for project, data in sorted(project_summaries.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
       d.append({
-         'Owner': owner,
-         'Parent': owner_parent_mapping.get(owner, '<unknown>'),
+         'Project': project,
+         'Parent': project_parent_mapping.get(project, '<unknown>'),
          'Uniq Usrs': data['users'],
          'Jobs': data['jobs'],
          'Core Hrs': round(data['core_hours']),
@@ -357,23 +357,23 @@ def summarise_owners(owners, users, owner_summaries, inv_total_time, core_hours_
       })
 
    t = {
-      'Owner': 'TOTALS',
+      'Project': 'TOTALS',
       'Parent': '-',
       'Uniq Usrs': len(users), # Note: unique users - not the sum of entries in column
-      'Jobs': reduce((lambda x, k: x + owner_summaries[k]['jobs']), owner_summaries, 0),
-      'Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours']), owner_summaries, 0),
-      '%Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours'] * inv_total_time), owner_summaries, 0)),
-      'Adj Core Hrs': reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0),
-      'Adj %Utl': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] * inv_total_time), owner_summaries, 0)),
-      '%Usg': percent(reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj'] / core_hours_adj), owner_summaries, 0)),
-      **{ b['name']: reduce((lambda x, k: x + owner_summaries[k]['job_size'][i]), owner_summaries, 0) for i, b in enumerate(bins) },
+      'Jobs': reduce((lambda x, k: x + project_summaries[k]['jobs']), project_summaries, 0),
+      'Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours']), project_summaries, 0),
+      '%Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours'] * inv_total_time), project_summaries, 0)),
+      'Adj Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0),
+      'Adj %Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] * inv_total_time), project_summaries, 0)),
+      '%Usg': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] / core_hours_adj), project_summaries, 0)),
+      **{ b['name']: reduce((lambda x, k: x + project_summaries[k]['job_size'][i]), project_summaries, 0) for i, b in enumerate(bins) },
    }
 
    return h, d, t
 
 
-def summarise_users(owners, users, inv_total_time, core_hours_adj, bins):
-   h = [ 'Usr', 'Owner(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+def summarise_users(projects, users, inv_total_time, core_hours_adj, bins):
+   h = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
       h.extend([b['name'] for b in bins])
 
@@ -384,7 +384,7 @@ def summarise_users(owners, users, inv_total_time, core_hours_adj, bins):
       if count > args.limitusers: break
       d.append({
          'Usr': user,
-         'Owner(s)': ",".join(sorted([o  for o in owners for u in owners[o] if u == user])),
+         'Project(s)': ",".join(sorted([o  for o in projects for u in projects[o] if u == user])),
          'Jobs': data['jobs'],
          'Core Hrs': round(data['core_hours']),
          '%Utl': percent(data['core_hours'] * inv_total_time),
@@ -396,7 +396,7 @@ def summarise_users(owners, users, inv_total_time, core_hours_adj, bins):
 
    t = {
       'Usr': 'TOTALS',
-      'Owner(s)': '-',
+      'Project(s)': '-',
       'Jobs': reduce((lambda x, k: x + users[k]['jobs']), users, 0),
       'Core Hrs': reduce((lambda x, k: x + users[k]['core_hours']), users, 0),
       '%Utl': percent(reduce((lambda x, k: x + users[k]['core_hours'] * inv_total_time), users, 0)),
@@ -408,14 +408,14 @@ def summarise_users(owners, users, inv_total_time, core_hours_adj, bins):
 
    return h, d, t
 
-def summarise_owner(owner, inv_total_time, core_hours_adj, bins):
+def summarise_project(project, inv_total_time, core_hours_adj, bins):
    h = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
       h.extend([b['name'] for b in bins])
 
    d = []
    count = 0
-   for user, data in sorted(owner.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+   for user, data in sorted(project.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
       count += 1
       if count > args.limitusers: break
       d.append({
@@ -431,13 +431,13 @@ def summarise_owner(owner, inv_total_time, core_hours_adj, bins):
 
    t = {
       'Usr': 'TOTALS',
-      'Jobs': reduce((lambda x, k: x + owner[k]['jobs']), owner, 0),
-      'Core Hrs': reduce((lambda x, k: x + owner[k]['core_hours']), owner, 0),
-      '%Utl': percent(reduce((lambda x, k: x + owner[k]['core_hours'] * inv_total_time), owner, 0)),
-      'Adj Core Hrs': reduce((lambda x, k: x + owner[k]['core_hours_adj']), owner, 0),
-      'Adj %Utl': percent(reduce((lambda x, k: x + owner[k]['core_hours_adj'] * inv_total_time), owner, 0)),
-      '%Usg': percent(reduce((lambda x, k: x + owner[k]['core_hours_adj'] / core_hours_adj), owner, 0)),
-      **{ b['name']: reduce((lambda x, k: x + owner[k]['job_size'][i]), owner, 0) for i, b in enumerate(bins) },
+      'Jobs': reduce((lambda x, k: x + project[k]['jobs']), project, 0),
+      'Core Hrs': reduce((lambda x, k: x + project[k]['core_hours']), project, 0),
+      '%Utl': percent(reduce((lambda x, k: x + project[k]['core_hours'] * inv_total_time), project, 0)),
+      'Adj Core Hrs': reduce((lambda x, k: x + project[k]['core_hours_adj']), project, 0),
+      'Adj %Utl': percent(reduce((lambda x, k: x + project[k]['core_hours_adj'] * inv_total_time), project, 0)),
+      '%Usg': percent(reduce((lambda x, k: x + project[k]['core_hours_adj'] / core_hours_adj), project, 0)),
+      **{ b['name']: reduce((lambda x, k: x + project[k]['job_size'][i]), project, 0) for i, b in enumerate(bins) },
    }
 
    return h, d, t
@@ -468,7 +468,7 @@ def print_table(headers, data, totals):
    print(tabulate(tab_data, headers=headers, floatfmt=",.0f"),"\n")
 
 
-def print_summary(owners, users, owner_summaries, total_cores, reports, bins):
+def print_summary(projects, users, project_summaries, total_cores, reports, bins):
 
    if 'header' in reports:
       print("Accounting summary, reporting on jobs ending in the range:")
@@ -487,38 +487,38 @@ def print_summary(owners, users, owner_summaries, total_cores, reports, bins):
    else:
       inv_total_time = 0
 
-   core_hours_adj = reduce((lambda x, k: x + owner_summaries[k]['core_hours_adj']), owner_summaries, 0)
+   core_hours_adj = reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0)
 
    if 'totals' in reports:
       print("=======")
       print("Totals:")
       print("=======\n")
-      print_table(*summarise_totals(owners, users, owner_summaries, inv_total_time, bins))
+      print_table(*summarise_totals(projects, users, project_summaries, inv_total_time, bins))
 
-   if 'owners' in reports:
+   if 'projects' in reports:
       print("===========")
-      print("Top owners:")
+      print("Top projects:")
       print("===========\n")
-      print_table(*summarise_owners(owners, users, owner_summaries, inv_total_time, core_hours_adj, bins))
+      print_table(*summarise_projects(projects, users, project_summaries, inv_total_time, core_hours_adj, bins))
 
    if 'users' in reports:
       print("==========")
       print("Top users:")
       print("==========\n")
       print_simplestats(users, args.limitusers)
-      print_table(*summarise_users(owners, users, inv_total_time, core_hours_adj, bins))
+      print_table(*summarise_users(projects, users, inv_total_time, core_hours_adj, bins))
 
-   if 'usersbyowner' in reports:
+   if 'usersbyproject' in reports:
       print("===================")
-      print("Top users by owner:")
+      print("Top users by project:")
       print("===================\n")
 
-      for owner in sorted(owners):
-         core_hours_adj = reduce((lambda x, k: x + owners[owner][k]['core_hours_adj']), owners[owner], 0)
+      for project in sorted(projects):
+         core_hours_adj = reduce((lambda x, k: x + projects[project][k]['core_hours_adj']), projects[project], 0)
 
-         print("Owner:", owner)
-         print_simplestats(owners[owner], args.limitusers)
-         print_table(*summarise_owner(owners[owner], inv_total_time, core_hours_adj, bins))
+         print("Project:", project)
+         print_simplestats(projects[project], args.limitusers)
+         print_table(*summarise_project(projects[project], inv_total_time, core_hours_adj, bins))
 
 
 def print_simplestats(data, top_n):
