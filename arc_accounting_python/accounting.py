@@ -36,13 +36,14 @@ parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsiz
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to report utilisation on")
 parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, owners, users, usersbyowner)")
+parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 
 args = parser.parse_args()
 
 # Prepare regexes
 # ---------------
 
-time_startend_def = re.compile(r"^(\d+)?(-(\d+)?)?$")
+range_def = re.compile(r"^(\d+)?(-(\d+)?)?$")
 
 datetime_def = re.compile(r"^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?$")
 
@@ -51,8 +52,9 @@ owner_def = re.compile(r"^([a-z]+_)?(\S+)")
 # Init parameters
 # ---------------
 
-# Maximum date to report on (YYYY[MM[DD[HH[MM[SS]]]]])
+# Maximum date (YYYY[MM[DD[HH[MM[SS]]]]]) or number to report on
 max_date = "40000101"
+max_num = sys.maxsize -1
 
 # Backup method of determining node memory per core (mpc), in absence of
 # node_type in job record, from hostname
@@ -144,18 +146,14 @@ def main():
    if not args.reports:
       args.reports = [ 'header', 'totals', 'owners', 'users', 'usersbyowner' ]
 
-   # Job size bins
-   #DEBUG - need to move to parseargs
-   args.sizebins = [
-      { 'start': 1, 'end': 1 },
-      { 'start': 2, 'end': 24 },
-      { 'start': 25, 'end': 48 },
-      { 'start': 49, 'end': 1024 },
-      { 'start': 1025, 'end': 10240 },
-   ]
+   # Job size bins, if not specified
+   if not args.sizebins:
+      args.sizebins = [ '1', '2-24', '25-48', '49-128', '129-256', '257-512', '513-10240' ]
 
+   sizebins = []
    for b in args.sizebins:
-      b['name'] = str(b['start']) + "-" + str(b['end'])
+      start, end = parse_startend(b, type='int')
+      sizebins.append({'name': b, 'start': start, 'end': end })
 
    # Parse date argument
    global start_time, end_time
@@ -177,7 +175,7 @@ def main():
                'jobs': 0,
                'core_hours': 0,
                'core_hours_adj': 0,
-               'job_size': [0 for b in args.sizebins],
+               'job_size': [0 for b in sizebins],
             }
 
          # - record usage
@@ -186,8 +184,8 @@ def main():
          owners[owner][user]['core_hours'] += record['core_hours']
          owners[owner][user]['core_hours_adj'] += record['core_hours_adj']
 
-         for (i, b) in enumerate(args.sizebins):
-            if record['job_size_adj'] >= b['start'] and record['job_size_adj'] <= b['end']:
+         for (i, b) in enumerate(sizebins):
+            if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
                owners[owner][user]['job_size'][i] += record['core_hours_adj']
 
    # Calculate a summary for each user
@@ -199,14 +197,14 @@ def main():
                'jobs': 0,
                'core_hours': 0,
                'core_hours_adj': 0,
-               'job_size': [0 for b in args.sizebins],
+               'job_size': [0 for b in sizebins],
             }
 
          users[user]['jobs'] += owners[owner][user]['jobs']
          users[user]['core_hours'] += owners[owner][user]['core_hours']
          users[user]['core_hours_adj'] += owners[owner][user]['core_hours_adj']
 
-         for (i, b) in enumerate(args.sizebins):
+         for (i, b) in enumerate(sizebins):
             users[user]['job_size'][i] += owners[owner][user]['job_size'][i]
 
 
@@ -218,7 +216,7 @@ def main():
          'jobs': 0,
          'core_hours': 0,
          'core_hours_adj': 0,
-         'job_size': [0 for b in args.sizebins],
+         'job_size': [0 for b in sizebins],
       }
 
       for user in data.values():
@@ -227,11 +225,11 @@ def main():
          owner_summaries[owner]['core_hours'] += user['core_hours']
          owner_summaries[owner]['core_hours_adj'] += user['core_hours_adj']
 
-         for (i, b) in enumerate(args.sizebins):
+         for (i, b) in enumerate(sizebins):
             owner_summaries[owner]['job_size'][i] += user['job_size'][i]
 
    # Spit out answer
-   print_summary(owners, users, owner_summaries, args.cores, args.reports, args.sizebins)
+   print_summary(owners, users, owner_summaries, args.cores, args.reports, sizebins)
 
 
 def record_filter(record):
@@ -555,34 +553,42 @@ def percent(num):
    return "{0:.1%}".format(float(num))
 
 
-# Take a date range string of format [DATE][-[DATE]], where DATE has format
-# YYYY[MM[DD[HH[MM[SS]]]]], and return a tuple with the seconds since the
-# epoch bounding the start and end of that range (start - inclusive,
-# end - exclusive).
-def parse_startend(date_str):
+# Take a range string of format [START][-[END]], where START and END are
+# either integers, or dates of format YYYY[MM[DD[HH[MM[SS]]]]] in UTC.
+#
+# Return a tuple bounding the start and end of that range (start - inclusive,
+# end - exclusive). Dates are returned as seconds since the epoch.
+def parse_startend(range_str, type='date'):
    start = 0
-   end = int(datetime.datetime(
-      *parse_date(max_date),
-      tzinfo=pytz.timezone('UTC'),
-   ).strftime('%s'))
+   end = max_num
 
-   if date_str:
-      r = time_startend_def.match(date_str)
+   if type == 'date':
+      end = int(datetime.datetime(
+         *parse_date(max_date),
+         tzinfo=pytz.timezone('UTC'),
+      ).strftime('%s'))
+
+   if range_str:
+      r = range_def.match(range_str)
       if r:
-         if r.group(1):
-            start_dt = datetime.datetime(
-               *datetime_defaults(*parse_date(r.group(1))),
+         if type == 'date':
+            if r.group(1):
+               start_dt = datetime.datetime(
+                  *datetime_defaults(*parse_date(r.group(1))),
+                  tzinfo=pytz.timezone('UTC'),
+               )
+
+               start = int(start_dt.strftime('%s'))
+
+            end_dt = next_datetime(
+               *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
                tzinfo=pytz.timezone('UTC'),
             )
 
-            start = int(start_dt.strftime('%s'))
-
-         end_dt = next_datetime(
-            *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
-            tzinfo=pytz.timezone('UTC'),
-         )
-
-         end   = int(end_dt.strftime('%s'))
+            end = int(end_dt.strftime('%s'))
+         elif type == 'int':
+            start = int(r.group(1) or 1)
+            end = int(r.group(3) or (r.group(2) and max_num) or r.group(1)) +1
 
    return start, end
 
