@@ -155,6 +155,16 @@ def main():
       start, end = parse_startend(b, type='int')
       sizebins.append({'name': b, 'start': start, 'end': end })
 
+   # Allow comma separated values to indicate arrays
+   #DEBUG - would be better as a custom parseargs action
+   args.skipqueues = commasep_list(args.skipqueues)
+   args.queues = commasep_list(args.queues)
+   args.projects = commasep_list(args.projects)
+   args.skipprojects = commasep_list(args.skipprojects)
+   args.accountingfile = commasep_list(args.accountingfile)
+   args.reports = commasep_list(args.reports)
+   args.sizebins = commasep_list(args.sizebins)
+
    # Parse date argument
    global start_time, end_time
    start_time, end_time = parse_startend(args.date)
@@ -637,6 +647,20 @@ def datetime_defaults(*date_time):
    if len(t) < 3: t.append(1) # day
 
    return tuple(t)
+
+
+# Returns input expanded into a list, split
+# as comma separate entries
+def commasep_list(data):
+   l = []
+
+   if type(data) == type([]):
+      for d in data:
+         l.extend(d.split(","))
+   elif data:
+      l.extend(data.split(","))
+
+   return l
 
 
 # Run program (if we've not been imported)
