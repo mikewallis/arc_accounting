@@ -26,7 +26,7 @@ from dateutil.relativedelta import relativedelta
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
-parser.add_argument('--date', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
+parser.add_argument('--dates', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
 parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
 parser.add_argument('--projects', action='append', type=str, help="Equipment project to report on")
@@ -134,6 +134,10 @@ project_project_mapping = {
 # --------
 
 def main():
+   # One date range, for all time if not specified
+   if not args.dates:
+      args.dates = [ '-' ]
+
    # Restrict to the core purchasers of ARC, if requested
    if args.coreprojects:
       args.projects = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
@@ -150,13 +154,9 @@ def main():
    if not args.sizebins:
       args.sizebins = [ '1', '2-24', '25-48', '49-128', '129-256', '257-512', '513-10240' ]
 
-   sizebins = []
-   for b in args.sizebins:
-      start, end = parse_startend(b, type='int')
-      sizebins.append({'name': b, 'start': start, 'end': end })
-
    # Allow comma separated values to indicate arrays
    #DEBUG - would be better as a custom parseargs action
+   args.dates = commasep_list(args.dates)
    args.skipqueues = commasep_list(args.skipqueues)
    args.queues = commasep_list(args.queues)
    args.projects = commasep_list(args.projects)
@@ -166,8 +166,14 @@ def main():
    args.sizebins = commasep_list(args.sizebins)
 
    # Parse date argument
+   dates = parse_startend(args.dates)
+
+   #DEBUG - for now, only use the first date range while we figure out how to handle more
    global start_time, end_time
-   start_time, end_time = parse_startend(args.date)
+   start_time, end_time = dates[0]['start'], dates[0]['end']
+
+   # Parse job size bins
+   sizebins = parse_startend(args.sizebins, type='int')
 
    # Collect raw data, split by project
    projects = {}
@@ -566,41 +572,46 @@ def percent(num):
 # Take a range string of format [START][-[END]], where START and END are
 # either integers, or dates of format YYYY[MM[DD[HH[MM[SS]]]]] in UTC.
 #
-# Return a tuple bounding the start and end of that range (start - inclusive,
-# end - exclusive). Dates are returned as seconds since the epoch.
-def parse_startend(range_str, type='date'):
-   start = 0
-   end = max_num
+# Return a list of dictionaries bounding the start and end of that range
+# (start - inclusive, end - exclusive). If input were dates, return dates
+# as seconds since the epoch.
+def parse_startend(ranges, type='date'):
+   d = []
+   for range_str in ranges:
+      start = 0
+      end = max_num
 
-   if type == 'date':
-      end = int(datetime.datetime(
-         *parse_date(max_date),
-         tzinfo=pytz.timezone('UTC'),
-      ).strftime('%s'))
+      if type == 'date':
+         end = int(datetime.datetime(
+            *parse_date(max_date),
+            tzinfo=pytz.timezone('UTC'),
+         ).strftime('%s'))
 
-   if range_str:
-      r = range_def.match(range_str)
-      if r:
-         if type == 'date':
-            if r.group(1):
-               start_dt = datetime.datetime(
-                  *datetime_defaults(*parse_date(r.group(1))),
+      if range_str:
+         r = range_def.match(range_str)
+         if r:
+            if type == 'date':
+               if r.group(1):
+                  start_dt = datetime.datetime(
+                     *datetime_defaults(*parse_date(r.group(1))),
+                     tzinfo=pytz.timezone('UTC'),
+                  )
+
+                  start = int(start_dt.strftime('%s'))
+
+               end_dt = next_datetime(
+                  *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
                   tzinfo=pytz.timezone('UTC'),
                )
 
-               start = int(start_dt.strftime('%s'))
+               end = int(end_dt.strftime('%s'))
+            elif type == 'int':
+               start = int(r.group(1) or 1)
+               end = int(r.group(3) or (r.group(2) and max_num) or r.group(1)) +1
 
-            end_dt = next_datetime(
-               *parse_date(r.group(3) or (r.group(2) and max_date) or r.group(1)),
-               tzinfo=pytz.timezone('UTC'),
-            )
+      d.append({ 'name': range_str, 'start': start, 'end': end })
 
-            end = int(end_dt.strftime('%s'))
-         elif type == 'int':
-            start = int(r.group(1) or 1)
-            end = int(r.group(3) or (r.group(2) and max_num) or r.group(1)) +1
-
-   return start, end
+   return d
 
 
 # Take a date/time string with optional components of format
