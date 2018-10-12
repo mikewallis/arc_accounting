@@ -209,7 +209,10 @@ def main():
       ##DEBUG - figure out what to do here when range is for all time
       d['date']['hours'] = (d['date']['end'] - d['date']['start'])/float(3600)
       d['date']['core_hours'] = d['date']['hours'] * args.cores
-      d['date']['inv_core_hours'] = 1/float(d['date']['core_hours'])
+      if d['date']['core_hours']:
+         d['date']['inv_core_hours'] = 1/float(d['date']['core_hours'])
+      else:
+         d['date']['inv_core_hours'] = 0
 
       # Aggregate info for each user
       for project in d['projects']:
@@ -366,7 +369,10 @@ def summarise_totals(data, total_cores, bins):
          **{ b['name']: sum([d['project_summaries'][p]['job_size'][i] for p in d['project_summaries']]) for i, b in enumerate(bins) },
       })
 
-   inv_total_core_hours = 1/float(total_core_hrs)
+   if total_core_hrs:
+      inv_total_core_hours = 1/float(total_core_hrs)
+   else:
+      inv_total_core_hours = 0
 
    totals = {
       'Range': 'TOTALS',
