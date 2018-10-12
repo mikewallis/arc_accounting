@@ -143,7 +143,7 @@ def main():
 
    # All reports, if not specified
    if not args.reports:
-      args.reports = [ 'header', 'totals', 'projects', 'users', 'usersbyproject' ]
+      args.reports = [ 'header', 'totals', 'projectsbydate', 'projects', 'users', 'usersbyproject' ]
 
    # Job size bins, if not specified
    if not args.sizebins:
@@ -394,6 +394,68 @@ def summarise_totals(data, total_cores, bins):
    return headers, table, totals
 
 
+def summarise_projectsbydate(data, project, total_cores, bins):
+   headers = [ 'Range', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+   if bins:
+      headers.extend([b['name'] for b in bins])
+
+   total_core_hours_adj = 0
+   total_core_hours = 0
+
+   table = []
+   for d in data:
+      #DEBUG - don't like this
+      core_hours_adj = reduce((lambda x, k: x + d['project_summaries'][k]['core_hours_adj']), d['project_summaries'], 0)
+      total_core_hours_adj += core_hours_adj
+
+      #DEBUG - don't like this either. total_core_hours_adj and total_core_hours
+      # are too similar, need different names
+      total_core_hours += d['date']['core_hours']
+      if total_core_hours:
+         inv_total_core_hours = 1/total_core_hours
+      else:
+         inv_total_core_hours = 0
+
+      if project in d['projects']:
+         table.append({
+            'Range': d['date']['name'],
+            'Users': d['project_summaries'][project]['users'],
+            'Jobs': d['project_summaries'][project]['jobs'],
+            'Core Hrs': d['project_summaries'][project]['core_hours'],
+            '%Utl': percent(d['project_summaries'][project]['core_hours'] * d['date']['inv_core_hours']),
+            'Adj Core Hrs': d['project_summaries'][project]['core_hours_adj'],
+            'Adj %Utl': percent(d['project_summaries'][project]['core_hours_adj'] * d['date']['inv_core_hours']),
+            '%Usg': percent(d['project_summaries'][project]['core_hours_adj'] / core_hours_adj),
+            **{ b['name']: d['project_summaries'][project]['job_size'][i] for i, b in enumerate(bins) },
+         })
+      else:
+         table.append({
+            'Range': d['date']['name'],
+            'Users': 0,
+            'Jobs': 0,
+            'Core Hrs': 0,
+            '%Utl': percent(0),
+            'Adj Core Hrs': 0,
+            'Adj %Utl': percent(0),
+            '%Usg': percent(0),
+            **{ b['name']: 0 for i, b in enumerate(bins) },
+         })
+
+   totals = {
+      'Range': 'TOTALS',
+      'Users': len(set([u for d in data for u in d['projects'].get(project, [])])),
+      'Jobs': sum([d['Jobs'] for d in table]),
+      'Core Hrs': sum([d['Core Hrs'] for d in table]),
+      '%Utl': percent(sum([d['Core Hrs'] for d in table]) * inv_total_core_hours),
+      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
+      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]) * inv_total_core_hours),
+      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]) / total_core_hours_adj),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
+   }
+
+   return headers, table, totals
+
+
 def summarise_projects(data, total_cores, bins):
    headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
@@ -555,33 +617,41 @@ def print_summary(data, total_cores, reports, bins):
       print("=======\n")
       print_table(*summarise_totals(data, total_cores, bins))
 
-   for d in data:
-      if 'projects' in reports:
-         print("=============")
-         print("Top projects:")
-         print("=============\n")
+   if 'projectsbydate' in reports:
+      print("=================")
+      print("Projects by date:")
+      print("=================\n")
+      for project in set([p for d in data for p in d['projects']]):
+         print("Project:", project)
+         print_table(*summarise_projectsbydate(data, project, total_cores, bins))
 
+   if 'projects' in reports:
+      print("=============")
+      print("Top projects:")
+      print("=============\n")
+
+      for d in data:
          print("Period:", d['date']['name'],"\n")
 
          print_table(*summarise_projects(d, total_cores, bins))
 
-   for d in data:
-      if 'users' in reports:
-         print("==========")
-         print("Top users:")
-         print("==========\n")
+   if 'users' in reports:
+      print("==========")
+      print("Top users:")
+      print("==========\n")
 
+      for d in data:
          print("Period:", d['date']['name'],"\n")
 
          print_simplestats(d['users'], args.limitusers)
          print_table(*summarise_users(d, total_cores, bins))
 
-   for d in data:
-      if 'usersbyproject' in reports:
-         print("=====================")
-         print("Top users by project:")
-         print("=====================\n")
+   if 'usersbyproject' in reports:
+      print("=====================")
+      print("Top users by project:")
+      print("=====================\n")
 
+      for d in data:
          print("Period:", d['date']['name'],"\n")
 
          for project in sorted(d['projects']):
