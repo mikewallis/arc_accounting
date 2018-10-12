@@ -39,6 +39,8 @@ parser.add_argument('--accountingfile', action='append', type=str, help="Read ac
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
 parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, totals, projects, users, usersbyproject)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
+parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
+parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
 
 args = parser.parse_args()
 
@@ -301,7 +303,10 @@ def record_modify(record):
 
    # Add size and core hour figures
 
-   size_adj = return_size_adj(record)
+   if args.noadjust:
+      size_adj = float(1)
+   else:
+      size_adj = return_size_adj(record)
 
    record['job_size'] = record['slots']
    record['job_size_adj'] = record['slots'] * size_adj
@@ -526,7 +531,12 @@ def print_table(headers, data, totals):
          except:
             None
 
-   print(tabulate(tab_data, headers=headers, floatfmt=",.0f"),"\n")
+   if args.nocommas:
+      floatfmt=".0f"
+   else:
+      floatfmt=",.0f"
+
+   print(tabulate(tab_data, headers=headers, floatfmt=floatfmt),"\n")
 
 
 def print_summary(data, total_cores, reports, bins):
