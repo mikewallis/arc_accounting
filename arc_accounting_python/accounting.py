@@ -26,16 +26,18 @@ from dateutil.relativedelta import relativedelta
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
-parser.add_argument('--dates', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018")
-parser.add_argument('--skipqueues', action='append', type=str, help="Queue to filter out")
-parser.add_argument('--queues', action='append', type=str, help="Queue to report on")
-parser.add_argument('--projects', action='append', type=str, help="Equipment project to report on")
-parser.add_argument('--skipprojects', action='append', type=str, help="Equipment project to filter out")
-parser.add_argument('--coreprojects', action='store_true', default=False, help="Report on core set of projects")
+parser.add_argument('--dates', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018. Multiple ranges supported.")
+parser.add_argument('--skipqueues', action='append', type=str, help="Queue(s) to filter out")
+parser.add_argument('--queues', action='append', type=str, help="Queue(s) to report on")
+parser.add_argument('--projects', action='append', type=str, help="Project(s) to report on")
+parser.add_argument('--skipprojects', action='append', type=str, help="Project(s) to filter out")
+parser.add_argument('--parents', action='append', type=str, help="Project parent(s) to report on")
+parser.add_argument('--skipparents', action='append', type=str, help="Project parent(s) to filter out")
+parser.add_argument('--coreprojects', action='store_true', default=False, help="Report on the core set of projects")
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
-parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to report utilisation on")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, projects, users, usersbyproject)")
+parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, totals, projects, users, usersbyproject)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 
 args = parser.parse_args()
@@ -75,8 +77,8 @@ backup_node_mpc = [
 for n in backup_node_mpc:
    n['re'] = re.compile(n['regex'])
 
-# ARC1 accounting file needs a different method to distinguish
-# equipment projects beyond the core projects
+# Some jobs weren't allocated to a project and should have been: use the
+# queue name to do this retrospectively
 queue_project_mapping = {
    'env1_sgpc.q': 'sgpc',
    'env1_glomap.q': 'glomap',
@@ -86,21 +88,12 @@ queue_project_mapping = {
    'chem1.q': 'chem',
    'civ1.q': 'civil',
    'mhd1.q': 'mhd',
+   'palaeo1.q': 'palaeo1',
 }
 
-# Parent of project mapping (e.g. mapping to core purchasers)
+# Parent of project mappings
+# (if not in table, assumes project is own parent)
 project_parent_mapping = {
-   'ENV': 'ENV',
-   'ENG': 'ENG',
-   'MAPS': 'MAPS',
-   'FBS': 'FBS',
-   'ARC': 'ARC',
-   'Arts': 'Arts',
-   'LUBS': 'LUBS',
-   'ESSL': 'ESSL',
-   'PVAC': 'PVAC',
-   'MEDH': 'MEDH',
-
    'minphys': 'ENV',
    'glocat': 'ENV',
    'glomap': 'ENV',
@@ -124,7 +117,7 @@ project_parent_mapping = {
 }
 
 # Some projects have changed names, or combined with other
-# projects over the years.
+# projects over the years. Combine them by updating old names.
 project_project_mapping = {
    'ISS': 'ARC',
    'UKMHD': 'MAPS',
@@ -161,6 +154,8 @@ def main():
    args.queues = commasep_list(args.queues)
    args.projects = commasep_list(args.projects)
    args.skipprojects = commasep_list(args.skipprojects)
+   args.parents = commasep_list(args.parents)
+   args.skipparents = commasep_list(args.skipparents)
    args.accountingfile = commasep_list(args.accountingfile)
    args.reports = commasep_list(args.reports)
    args.sizebins = commasep_list(args.sizebins)
@@ -181,7 +176,7 @@ def main():
          for d in data:
             if record_filter(record, d['date']):
                user = record['owner']
-               project = record['equip_project'] # (refers to the equipment project)
+               project = record['project']
 
                # - init data
 
@@ -268,15 +263,19 @@ def record_filter(record, date):
    if args.queues and record['qname'] not in args.queues: return False
 
    # - Project filtering
-   if args.skipprojects and record['equip_project'] in args.skipprojects: return False
-   if args.projects and record['equip_project'] not in args.projects: return False
+   if args.skipprojects and record['project'] in args.skipprojects: return False
+   if args.projects and record['project'] not in args.projects: return False
+
+   # - Project parent filtering
+   if args.skipparents and record['parent'] in args.skipparents: return False
+   if args.parents and record['parent'] not in args.parents: return False
 
    return True
 
 
 def record_modify(record):
 
-   # Add record equipment project in record
+   # Tweak project
 
    r = project_def.match(record['project'])
    if r:
@@ -292,7 +291,10 @@ def record_modify(record):
    else:
       project = '<unknown>'
 
-   record['equip_project'] = project
+   record['project'] = project
+
+   # Add project parent
+   record['parent'] = project_parent_mapping.get(project, project)
 
    # Add size and core hour figures
 
@@ -342,7 +344,7 @@ def return_size_adj(record):
 
 
 def summarise_totals(data, total_cores, bins):
-   headers = [ 'Range', 'Projects', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+   headers = [ 'Range', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -355,7 +357,7 @@ def summarise_totals(data, total_cores, bins):
       table.append({
          'Range': d['date']['name'],
          'Projects': len(d['project_summaries']),
-         'Uniq Usrs': len(d['users']),
+         'Users': len(d['users']),
          'Jobs': sum([d['project_summaries'][p]['jobs'] for p in d['project_summaries']]),
          'Core Hrs': sum([d['project_summaries'][p]['core_hours'] for p in d['project_summaries']]),
          '%Utl': percent(d['date']['inv_core_hours'] * sum([d['project_summaries'][p]['core_hours'] for p in d['project_summaries']])),
@@ -369,7 +371,7 @@ def summarise_totals(data, total_cores, bins):
    totals = {
       'Range': 'TOTALS',
       'Projects': len(set([p for d in data for p in d['projects']])),
-      'Uniq Usrs': len(set([u for d in data for u in d['users']])),
+      'Users': len(set([u for d in data for u in d['users']])),
       'Jobs': sum([d['Jobs'] for d in table]),
       'Core Hrs': sum([d['Core Hrs'] for d in table]),
       '%Utl': percent(inv_total_core_hours * sum([d['Core Hrs'] for d in table])),
@@ -382,7 +384,7 @@ def summarise_totals(data, total_cores, bins):
 
 
 def summarise_projects(data, total_cores, bins):
-   headers = [ 'Project', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+   headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -394,7 +396,7 @@ def summarise_projects(data, total_cores, bins):
       table.append({
          'Project': project,
          'Parent': project_parent_mapping.get(project, project),
-         'Uniq Usrs': d['users'],
+         'Users': d['users'],
          'Jobs': d['jobs'],
          'Core Hrs': d['core_hours'],
          '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
@@ -407,7 +409,7 @@ def summarise_projects(data, total_cores, bins):
    totals = {
       'Project': 'TOTALS',
       'Parent': '-',
-      'Uniq Usrs': len(data['users']), # Note: unique users - not the sum of entries in column
+      'Users': len(data['users']),
       'Jobs': sum([d['Jobs'] for d in table]),
       'Core Hrs': sum([d['Core Hrs'] for d in table]),
       '%Utl': percent(sum([d['Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
