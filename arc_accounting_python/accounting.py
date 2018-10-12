@@ -404,7 +404,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
 
    table = []
    for d in data:
-      #DEBUG - don't like this
+      #DEBUG - don't like this - need to convert division into multiplication
       core_hours_adj = reduce((lambda x, k: x + d['project_summaries'][k]['core_hours_adj']), d['project_summaries'], 0)
       total_core_hours_adj += core_hours_adj
 
@@ -461,7 +461,7 @@ def summarise_projects(data, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   #DEBUG - don't like this
+   #DEBUG - don't like this - need to convert division into multiplication
    core_hours_adj = reduce((lambda x, k: x + data['project_summaries'][k]['core_hours_adj']), data['project_summaries'], 0)
 
    table = []
@@ -500,7 +500,7 @@ def summarise_users(data, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   #DEBUG - don't like this
+   #DEBUG - don't like this - need to convert division into multiplication
    core_hours_adj = reduce((lambda x, k: x + data['project_summaries'][k]['core_hours_adj']), data['project_summaries'], 0)
 
    table = []
@@ -539,6 +539,7 @@ def summarise_project(data, project, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
+   #DEBUG - don't like this - need to convert division into multiplication
    core_hours_adj = reduce((lambda x, k: x + data['projects'][project][k]['core_hours_adj']), data['projects'][project], 0)
 
    table = []
@@ -635,6 +636,8 @@ def print_summary(data, total_cores, reports, bins):
 
          print_table(*summarise_projects(d, total_cores, bins))
 
+   ##DEBUG - need a usersbydate table?
+
    if 'users' in reports:
       print("==========")
       print("Top users:")
@@ -645,6 +648,8 @@ def print_summary(data, total_cores, reports, bins):
 
          print_simplestats(d['users'], args.limitusers)
          print_table(*summarise_users(d, total_cores, bins))
+
+   ##DEBUG - need a usersbyprojectbydate table?
 
    if 'usersbyproject' in reports:
       print("=====================")
