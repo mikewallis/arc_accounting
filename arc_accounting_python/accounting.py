@@ -219,7 +219,6 @@ def main():
       # Aggregate info for each user
       for project in d['projects']:
          for user in d['projects'][project]:
-            print(d['projects'][project])
             if user not in d['users']:
                d['users'][user] = {
                   'jobs': 0,
@@ -397,9 +396,9 @@ def summarise_projects(data, total_cores, bins):
          'Parent': project_parent_mapping.get(project, project),
          'Uniq Usrs': d['users'],
          'Jobs': d['jobs'],
-         'Core Hrs': round(d['core_hours']),
+         'Core Hrs': d['core_hours'],
          '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
-         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
          '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
@@ -438,9 +437,9 @@ def summarise_users(data, total_cores, bins):
          'Usr': user,
          'Project(s)': ",".join(sorted([o for o in data['projects'] for u in data['projects'][o] if u == user])),
          'Jobs': d['jobs'],
-         'Core Hrs': round(d['core_hours']),
+         'Core Hrs': d['core_hours'],
          '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
-         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
          '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
@@ -475,9 +474,9 @@ def summarise_project(data, project, total_cores, bins):
       table.append({
          'Usr': user,
          'Jobs': d['jobs'],
-         'Core Hrs': round(d['core_hours']),
+         'Core Hrs': d['core_hours'],
          '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
-         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
          '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
