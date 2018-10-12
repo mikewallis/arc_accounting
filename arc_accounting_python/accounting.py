@@ -134,7 +134,7 @@ project_project_mapping = {
 # --------
 
 def main():
-   # One date range, for all time if not specified
+   # One date range for all time, if not specified
    if not args.dates:
       args.dates = [ '-' ]
 
@@ -166,91 +166,103 @@ def main():
    args.sizebins = commasep_list(args.sizebins)
 
    # Parse date argument
+   global dates
    dates = parse_startend(args.dates)
-
-   #DEBUG - for now, only use the first date range while we figure out how to handle more
-   global start_time, end_time
-   start_time, end_time = dates[0]['start'], dates[0]['end']
 
    # Parse job size bins
    sizebins = parse_startend(args.sizebins, type='int')
 
-   # Collect raw data, split by project
-   projects = {}
+   # Initialise our main data structure
+   data = [ { 'date': d, 'projects': {}, 'users': {}, 'project_summaries': {} } for d in dates]
+
+   # Collect raw data, split by project and user
    for accounting in args.accountingfile:
-      for record in sge.records(accounting=accounting, modify=record_modify, filter=record_filter):
-         user = record['owner']
-         project = record['equip_project'] # (refers to the equipment project)
+      for record in sge.records(accounting=accounting, modify=record_modify):
+         for d in data:
+            if record_filter(record, d['date']):
+               user = record['owner']
+               project = record['equip_project'] # (refers to the equipment project)
 
-         # - init data
-         if project not in projects:
-            projects[project] = {}
+               # - init data
 
-         if user not in projects[project]:
-            projects[project][user] = {
-               'jobs': 0,
-               'core_hours': 0,
-               'core_hours_adj': 0,
-               'job_size': [0 for b in sizebins],
-            }
+               if project not in d['projects']:
+                  d['projects'][project] = {}
 
-         # - record usage
-         projects[project][user]['jobs'] += 1
+               if user not in d['projects'][project]:
+                  d['projects'][project][user] = {
+                     'jobs': 0,
+                     'core_hours': 0,
+                     'core_hours_adj': 0,
+                     'job_size': [0 for b in sizebins],
+                  }
 
-         projects[project][user]['core_hours'] += record['core_hours']
-         projects[project][user]['core_hours_adj'] += record['core_hours_adj']
+               # - record usage
 
-         for (i, b) in enumerate(sizebins):
-            if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
-               projects[project][user]['job_size'][i] += record['core_hours_adj']
+               d['projects'][project][user]['jobs'] += 1
 
-   # Calculate a summary for each user
-   users = {}
-   for project in projects:
-      for user in projects[project]:
-         if user not in users:
-            users[user] = {
-               'jobs': 0,
-               'core_hours': 0,
-               'core_hours_adj': 0,
-               'job_size': [0 for b in sizebins],
-            }
+               d['projects'][project][user]['core_hours'] += record['core_hours']
+               d['projects'][project][user]['core_hours_adj'] += record['core_hours_adj']
 
-         users[user]['jobs'] += projects[project][user]['jobs']
-         users[user]['core_hours'] += projects[project][user]['core_hours']
-         users[user]['core_hours_adj'] += projects[project][user]['core_hours_adj']
-
-         for (i, b) in enumerate(sizebins):
-            users[user]['job_size'][i] += projects[project][user]['job_size'][i]
+               for (i, b) in enumerate(sizebins):
+                  if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
+                     d['projects'][project][user]['job_size'][i] += record['core_hours_adj']
 
 
-   # Calculate a summary for each project
-   project_summaries = {}
-   for project, data in projects.items():
-      project_summaries[project] = {
-         'users': 0,
-         'jobs': 0,
-         'core_hours': 0,
-         'core_hours_adj': 0,
-         'job_size': [0 for b in sizebins],
-      }
+   # Create summary info for projects and users
+   for d in data:
+      # Store info derived from date range
+      ##DEBUG - figure out what to do here when range is for all time
+      d['date']['hours'] = (d['date']['end'] - d['date']['start'])/float(3600)
+      d['date']['core_hours'] = d['date']['hours'] * args.cores
+      d['date']['inv_core_hours'] = 1/float(d['date']['core_hours'])
 
-      for user in data.values():
-         project_summaries[project]['users'] += 1
-         project_summaries[project]['jobs'] += user['jobs']
-         project_summaries[project]['core_hours'] += user['core_hours']
-         project_summaries[project]['core_hours_adj'] += user['core_hours_adj']
+      # Aggregate info for each user
+      for project in d['projects']:
+         for user in d['projects'][project]:
+            print(d['projects'][project])
+            if user not in d['users']:
+               d['users'][user] = {
+                  'jobs': 0,
+                  'core_hours': 0,
+                  'core_hours_adj': 0,
+                  'job_size': [0 for b in sizebins],
+               }
 
-         for (i, b) in enumerate(sizebins):
-            project_summaries[project]['job_size'][i] += user['job_size'][i]
+            d['users'][user]['jobs'] += d['projects'][project][user]['jobs']
+            d['users'][user]['core_hours'] += d['projects'][project][user]['core_hours']
+            d['users'][user]['core_hours_adj'] += d['projects'][project][user]['core_hours_adj']
+
+            for (i, b) in enumerate(sizebins):
+               d['users'][user]['job_size'][i] += d['projects'][project][user]['job_size'][i]
+
+
+      # Aggregate info for each project
+      for project, dat in d['projects'].items():
+         d['project_summaries'][project] = {
+            'users': 0,
+            'jobs': 0,
+            'core_hours': 0,
+            'core_hours_adj': 0,
+            'job_size': [0 for b in sizebins],
+         }
+
+         for user in dat.values():
+            d['project_summaries'][project]['users'] += 1
+            d['project_summaries'][project]['jobs'] += user['jobs']
+            d['project_summaries'][project]['core_hours'] += user['core_hours']
+            d['project_summaries'][project]['core_hours_adj'] += user['core_hours_adj']
+
+            for (i, b) in enumerate(sizebins):
+               d['project_summaries'][project]['job_size'][i] += user['job_size'][i]
+
 
    # Spit out answer
-   print_summary(projects, users, project_summaries, args.cores, args.reports, sizebins)
+   print_summary(data, args.cores, args.reports, sizebins)
 
 
-def record_filter(record):
+def record_filter(record, date):
    # - Time filtering
-   if record['end_time'] < start_time or record['start_time'] >= end_time: return False
+   if record['end_time'] < date['start'] or record['start_time'] >= date['end']: return False
 
    # - Queue filtering
    if args.skipqueues and record['qname'] in args.skipqueues: return False
@@ -330,133 +342,159 @@ def return_size_adj(record):
    return size_adj
 
 
-def summarise_totals(projects, users, project_summaries, inv_total_time, bins):
-   h = [ 'Projects', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+def summarise_totals(data, total_cores, bins):
+   headers = [ 'Range', 'Projects', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
    if bins:
-      h.extend([b['name'] for b in bins])
+      headers.extend([b['name'] for b in bins])
 
-   d = [
-      {
-         'Projects': len(project_summaries),
-         'Uniq Usrs': len(users),
-         'Jobs': reduce((lambda x, k: x + project_summaries[k]['jobs']), project_summaries, 0),
-         'Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours']), project_summaries, 0),
-         '%Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours'] * inv_total_time), project_summaries, 0)),
-         'Adj Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0),
-         'Adj %Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] * inv_total_time), project_summaries, 0)),
-         **{ b['name']: reduce((lambda x, k: x + project_summaries[k]['job_size'][i]), project_summaries, 0) for i, b in enumerate(bins) },
-      },
-   ]
-   t = None
+   total_core_hrs = 0
 
-   return h, d, t
+   table = []
+   for d in data:
+      total_core_hrs += d['date']['core_hours']
 
-
-def summarise_projects(projects, users, project_summaries, inv_total_time, core_hours_adj, bins):
-   h = [ 'Project', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
-   if bins:
-      h.extend([b['name'] for b in bins])
-
-   d = []
-   for project, data in sorted(project_summaries.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
-      d.append({
-         'Project': project,
-         'Parent': project_parent_mapping.get(project, '<unknown>'),
-         'Uniq Usrs': data['users'],
-         'Jobs': data['jobs'],
-         'Core Hrs': round(data['core_hours']),
-         '%Utl': percent(data['core_hours'] * inv_total_time),
-         'Adj Core Hrs': round(data['core_hours_adj']),
-         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
-         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
-         **{ b['name']: data['job_size'][i] for i, b in enumerate(bins) },
+      table.append({
+         'Range': d['date']['name'],
+         'Projects': len(d['project_summaries']),
+         'Uniq Usrs': len(d['users']),
+         'Jobs': sum([d['project_summaries'][p]['jobs'] for p in d['project_summaries']]),
+         'Core Hrs': sum([d['project_summaries'][p]['core_hours'] for p in d['project_summaries']]),
+         '%Utl': percent(d['date']['inv_core_hours'] * sum([d['project_summaries'][p]['core_hours'] for p in d['project_summaries']])),
+         'Adj Core Hrs': sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']]),
+         'Adj %Utl': percent(d['date']['inv_core_hours'] * sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']])),
+         **{ b['name']: sum([d['project_summaries'][p]['job_size'][i] for p in d['project_summaries']]) for i, b in enumerate(bins) },
       })
 
-   t = {
+   inv_total_core_hours = 1/float(total_core_hrs)
+
+   totals = {
+      'Range': 'TOTALS',
+      'Projects': len(set([p for d in data for p in d['projects']])),
+      'Uniq Usrs': len(set([u for d in data for u in d['users']])),
+      'Jobs': sum([d['Jobs'] for d in table]),
+      'Core Hrs': sum([d['Core Hrs'] for d in table]),
+      '%Utl': percent(inv_total_core_hours * sum([d['Core Hrs'] for d in table])),
+      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
+      'Adj %Utl': percent(inv_total_core_hours * sum([d['Adj Core Hrs'] for d in table])),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
+   }
+
+   return headers, table, totals
+
+
+def summarise_projects(data, total_cores, bins):
+   headers = [ 'Project', 'Parent', 'Uniq Usrs', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+   if bins:
+      headers.extend([b['name'] for b in bins])
+
+   #DEBUG - don't like this
+   core_hours_adj = reduce((lambda x, k: x + data['project_summaries'][k]['core_hours_adj']), data['project_summaries'], 0)
+
+   table = []
+   for project, d in sorted(data['project_summaries'].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+      table.append({
+         'Project': project,
+         'Parent': project_parent_mapping.get(project, project),
+         'Uniq Usrs': d['users'],
+         'Jobs': d['jobs'],
+         'Core Hrs': round(d['core_hours']),
+         '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
+         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
+         '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
+         **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
+      })
+
+   totals = {
       'Project': 'TOTALS',
       'Parent': '-',
-      'Uniq Usrs': len(users), # Note: unique users - not the sum of entries in column
-      'Jobs': reduce((lambda x, k: x + project_summaries[k]['jobs']), project_summaries, 0),
-      'Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours']), project_summaries, 0),
-      '%Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours'] * inv_total_time), project_summaries, 0)),
-      'Adj Core Hrs': reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0),
-      'Adj %Utl': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] * inv_total_time), project_summaries, 0)),
-      '%Usg': percent(reduce((lambda x, k: x + project_summaries[k]['core_hours_adj'] / core_hours_adj), project_summaries, 0)),
-      **{ b['name']: reduce((lambda x, k: x + project_summaries[k]['job_size'][i]), project_summaries, 0) for i, b in enumerate(bins) },
+      'Uniq Usrs': len(data['users']), # Note: unique users - not the sum of entries in column
+      'Jobs': sum([d['Jobs'] for d in table]),
+      'Core Hrs': sum([d['Core Hrs'] for d in table]),
+      '%Utl': percent(sum([d['Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
+      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]) / core_hours_adj),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
-   return h, d, t
+   return headers, table, totals
 
 
-def summarise_users(projects, users, inv_total_time, core_hours_adj, bins):
-   h = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+def summarise_users(data, total_cores, bins):
+   headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
-      h.extend([b['name'] for b in bins])
+      headers.extend([b['name'] for b in bins])
 
-   d = []
+   #DEBUG - don't like this
+   core_hours_adj = reduce((lambda x, k: x + data['project_summaries'][k]['core_hours_adj']), data['project_summaries'], 0)
+
+   table = []
    count = 0
-   for user, data in sorted(users.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+   for user, d in sorted(data['users'].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
       count += 1
       if count > args.limitusers: break
-      d.append({
+      table.append({
          'Usr': user,
-         'Project(s)': ",".join(sorted([o  for o in projects for u in projects[o] if u == user])),
-         'Jobs': data['jobs'],
-         'Core Hrs': round(data['core_hours']),
-         '%Utl': percent(data['core_hours'] * inv_total_time),
-         'Adj Core Hrs': round(data['core_hours_adj']),
-         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
-         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
-         **{ b['name']: data['job_size'][i] for i, b in enumerate(bins) },
+         'Project(s)': ",".join(sorted([o for o in data['projects'] for u in data['projects'][o] if u == user])),
+         'Jobs': d['jobs'],
+         'Core Hrs': round(d['core_hours']),
+         '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
+         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
+         '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
+         **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       })
 
-   t = {
+   totals = {
       'Usr': 'TOTALS',
       'Project(s)': '-',
-      'Jobs': reduce((lambda x, k: x + users[k]['jobs']), users, 0),
-      'Core Hrs': reduce((lambda x, k: x + users[k]['core_hours']), users, 0),
-      '%Utl': percent(reduce((lambda x, k: x + users[k]['core_hours'] * inv_total_time), users, 0)),
-      'Adj Core Hrs': reduce((lambda x, k: x + users[k]['core_hours_adj']), users, 0),
-      'Adj %Utl': percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] * inv_total_time), users, 0)),
-      '%Usg': percent(reduce((lambda x, k: x + users[k]['core_hours_adj'] / core_hours_adj), users, 0)),
-      **{ b['name']: reduce((lambda x, k: x + users[k]['job_size'][i]), users, 0) for i, b in enumerate(bins) },
+      'Jobs': sum([d['Jobs'] for d in table]),
+      'Core Hrs': sum([d['Core Hrs'] for d in table]),
+      '%Utl': percent(sum([d['Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
+      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]) / core_hours_adj),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
-   return h, d, t
+   return headers, table, totals
 
-def summarise_project(project, inv_total_time, core_hours_adj, bins):
-   h = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+def summarise_project(data, project, total_cores, bins):
+   headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
-      h.extend([b['name'] for b in bins])
+      headers.extend([b['name'] for b in bins])
 
-   d = []
+   core_hours_adj = reduce((lambda x, k: x + data['projects'][project][k]['core_hours_adj']), data['projects'][project], 0)
+
+   table = []
    count = 0
-   for user, data in sorted(project.items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+   for user, d in sorted(data['projects'][project].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
       count += 1
       if count > args.limitusers: break
-      d.append({
+      table.append({
          'Usr': user,
-         'Jobs': data['jobs'],
-         'Core Hrs': round(data['core_hours']),
-         '%Utl': percent(data['core_hours'] * inv_total_time),
-         'Adj Core Hrs': round(data['core_hours_adj']),
-         'Adj %Utl': percent(data['core_hours_adj'] * inv_total_time),
-         '%Usg': percent(data['core_hours_adj'] / core_hours_adj),
-         **{ b['name']: data['job_size'][i] for i, b in enumerate(bins) },
+         'Jobs': d['jobs'],
+         'Core Hrs': round(d['core_hours']),
+         '%Utl': percent(d['core_hours'] * data['date']['inv_core_hours']),
+         'Adj Core Hrs': round(d['core_hours_adj']),
+         'Adj %Utl': percent(d['core_hours_adj'] * data['date']['inv_core_hours']),
+         '%Usg': percent(d['core_hours_adj'] / core_hours_adj),
+         **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       })
 
-   t = {
+   totals = {
       'Usr': 'TOTALS',
-      'Jobs': reduce((lambda x, k: x + project[k]['jobs']), project, 0),
-      'Core Hrs': reduce((lambda x, k: x + project[k]['core_hours']), project, 0),
-      '%Utl': percent(reduce((lambda x, k: x + project[k]['core_hours'] * inv_total_time), project, 0)),
-      'Adj Core Hrs': reduce((lambda x, k: x + project[k]['core_hours_adj']), project, 0),
-      'Adj %Utl': percent(reduce((lambda x, k: x + project[k]['core_hours_adj'] * inv_total_time), project, 0)),
-      '%Usg': percent(reduce((lambda x, k: x + project[k]['core_hours_adj'] / core_hours_adj), project, 0)),
-      **{ b['name']: reduce((lambda x, k: x + project[k]['job_size'][i]), project, 0) for i, b in enumerate(bins) },
+      'Jobs': sum([d['Jobs'] for d in table]),
+      'Core Hrs': sum([d['Core Hrs'] for d in table]),
+      '%Utl': percent(sum([d['Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
+      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]) * data['date']['inv_core_hours']),
+      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]) / core_hours_adj),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
-   return h, d, t
+   return headers, table, totals
 
 
 def print_table(headers, data, totals):
@@ -484,57 +522,55 @@ def print_table(headers, data, totals):
    print(tabulate(tab_data, headers=headers, floatfmt=",.0f"),"\n")
 
 
-def print_summary(projects, users, project_summaries, total_cores, reports, bins):
+def print_summary(data, total_cores, reports, bins):
 
    if 'header' in reports:
-      print("Accounting summary, reporting on jobs ending in the range:")
-      print(" Start:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(start_time)))
-      print(" End:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(end_time)))
-      print(" Duration:", (end_time - start_time)//3600, "hours", "Cores:", total_cores)
-      print("")
-
-   # Note: lots of promoting ints to floats for two reasons:
-   # - make divisions behave the same on python2
-   # - tabulate only provides the option to separate thousands for floats
-
-   ##DEBUG - figure out what to do here when range is for all time
-   if total_cores:
-      inv_total_time = 1/float(((end_time - start_time)/float(3600)) * total_cores)
-   else:
-      inv_total_time = 0
-
-   core_hours_adj = reduce((lambda x, k: x + project_summaries[k]['core_hours_adj']), project_summaries, 0)
+      print("Accounting summary, reporting on jobs ending in the range(s):")
+      for d in data:
+         print(" Start:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(d['date']['start'])))
+         print(" End:", time.strftime("%a, %d %b %Y %H:%M:%S %Z", time.gmtime(d['date']['end'])))
+         print(" Duration:", (d['date']['end'] - d['date']['start'])//3600, "hours", "Cores:", total_cores)
+         print("")
 
    if 'totals' in reports:
       print("=======")
       print("Totals:")
       print("=======\n")
-      print_table(*summarise_totals(projects, users, project_summaries, inv_total_time, bins))
+      print_table(*summarise_totals(data, total_cores, bins))
 
-   if 'projects' in reports:
-      print("===========")
-      print("Top projects:")
-      print("===========\n")
-      print_table(*summarise_projects(projects, users, project_summaries, inv_total_time, core_hours_adj, bins))
+   for d in data:
+      if 'projects' in reports:
+         print("=============")
+         print("Top projects:")
+         print("=============\n")
 
-   if 'users' in reports:
-      print("==========")
-      print("Top users:")
-      print("==========\n")
-      print_simplestats(users, args.limitusers)
-      print_table(*summarise_users(projects, users, inv_total_time, core_hours_adj, bins))
+         print("Period:", d['date']['name'],"\n")
 
-   if 'usersbyproject' in reports:
-      print("===================")
-      print("Top users by project:")
-      print("===================\n")
+         print_table(*summarise_projects(d, total_cores, bins))
 
-      for project in sorted(projects):
-         core_hours_adj = reduce((lambda x, k: x + projects[project][k]['core_hours_adj']), projects[project], 0)
+   for d in data:
+      if 'users' in reports:
+         print("==========")
+         print("Top users:")
+         print("==========\n")
 
-         print("Project:", project)
-         print_simplestats(projects[project], args.limitusers)
-         print_table(*summarise_project(projects[project], inv_total_time, core_hours_adj, bins))
+         print("Period:", d['date']['name'],"\n")
+
+         print_simplestats(d['users'], args.limitusers)
+         print_table(*summarise_users(d, total_cores, bins))
+
+   for d in data:
+      if 'usersbyproject' in reports:
+         print("=====================")
+         print("Top users by project:")
+         print("=====================\n")
+
+         print("Period:", d['date']['name'],"\n")
+
+         for project in sorted(d['projects']):
+            print("Project:", project)
+            print_simplestats(d['projects'][project], args.limitusers)
+            print_table(*summarise_project(d, project, total_cores, bins))
 
 
 def print_simplestats(data, top_n):
