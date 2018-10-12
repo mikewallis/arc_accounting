@@ -352,7 +352,7 @@ def return_size_adj(record):
 
 
 def summarise_totals(data, total_cores, bins):
-   headers = [ 'Range', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -363,7 +363,7 @@ def summarise_totals(data, total_cores, bins):
       total_core_hrs += d['date']['core_hours']
 
       table.append({
-         'Range': d['date']['name'],
+         'Date': d['date']['name'],
          'Projects': len(d['project_summaries']),
          'Users': len(d['users']),
          'Jobs': sum([d['project_summaries'][p]['jobs'] for p in d['project_summaries']]),
@@ -380,7 +380,7 @@ def summarise_totals(data, total_cores, bins):
       inv_total_core_hours = 0
 
    totals = {
-      'Range': 'TOTALS',
+      'Date': 'TOTALS',
       'Projects': len(set([p for d in data for p in d['projects']])),
       'Users': len(set([u for d in data for u in d['users']])),
       'Jobs': sum([d['Jobs'] for d in table]),
@@ -395,7 +395,7 @@ def summarise_totals(data, total_cores, bins):
 
 
 def summarise_projectsbydate(data, project, total_cores, bins):
-   headers = [ 'Range', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
+   headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -418,7 +418,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
 
       if project in d['projects']:
          table.append({
-            'Range': d['date']['name'],
+            'Date': d['date']['name'],
             'Users': d['project_summaries'][project]['users'],
             'Jobs': d['project_summaries'][project]['jobs'],
             'Core Hrs': d['project_summaries'][project]['core_hours'],
@@ -430,7 +430,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
          })
       else:
          table.append({
-            'Range': d['date']['name'],
+            'Date': d['date']['name'],
             'Users': 0,
             'Jobs': 0,
             'Core Hrs': 0,
@@ -442,7 +442,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
          })
 
    totals = {
-      'Range': 'TOTALS',
+      'Date': 'TOTALS',
       'Users': len(set([u for d in data for u in d['projects'].get(project, [])])),
       'Jobs': sum([d['Jobs'] for d in table]),
       'Core Hrs': sum([d['Core Hrs'] for d in table]),
