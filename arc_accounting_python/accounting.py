@@ -37,7 +37,7 @@ parser.add_argument('--coreprojects', action='store_true', default=False, help="
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: header, totals, projects, users, usersbyproject)")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: totals, projects, users, usersbyproject)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
 parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
@@ -143,7 +143,7 @@ def main():
 
    # All reports, if not specified
    if not args.reports:
-      args.reports = [ 'header', 'totals', 'projectsbydate', 'projects', 'users', 'usersbyproject' ]
+      args.reports = [ 'totals', 'projectsbydate', 'projects', 'users', 'usersbyproject' ]
 
    # Job size bins, if not specified
    if not args.sizebins:
@@ -180,7 +180,7 @@ def main():
                user = record['owner']
                project = record['project']
 
-               # - init data
+               # Init data
 
                if project not in d['projects']:
                   d['projects'][project] = {}
@@ -190,16 +190,25 @@ def main():
                      'jobs': 0,
                      'core_hours': 0,
                      'core_hours_adj': 0,
+                     'cpu_hours': 0,
                      'job_size': [0 for b in sizebins],
                   }
 
-               # - record usage
+               # Record usage
 
+               # - count jobs
                d['projects'][project][user]['jobs'] += 1
 
+               # - count blocked core hours
                d['projects'][project][user]['core_hours'] += record['core_hours']
                d['projects'][project][user]['core_hours_adj'] += record['core_hours_adj']
 
+               # - count used core hours
+               d['projects'][project][user]['cpu_hours'] += record['cpu'] / float(3600)
+
+               #d['projects'][project][user]['mem'] += record['maxvmem']
+
+               # - job size distribution
                for (i, b) in enumerate(sizebins):
                   if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
                      d['projects'][project][user]['job_size'][i] += record['core_hours_adj']
@@ -224,12 +233,14 @@ def main():
                   'jobs': 0,
                   'core_hours': 0,
                   'core_hours_adj': 0,
+                  'cpu_hours': 0,
                   'job_size': [0 for b in sizebins],
                }
 
             d['users'][user]['jobs'] += d['projects'][project][user]['jobs']
             d['users'][user]['core_hours'] += d['projects'][project][user]['core_hours']
             d['users'][user]['core_hours_adj'] += d['projects'][project][user]['core_hours_adj']
+            d['users'][user]['cpu_hours'] += d['projects'][project][user]['cpu_hours']
 
             for (i, b) in enumerate(sizebins):
                d['users'][user]['job_size'][i] += d['projects'][project][user]['job_size'][i]
@@ -242,6 +253,7 @@ def main():
             'jobs': 0,
             'core_hours': 0,
             'core_hours_adj': 0,
+            'cpu_hours': 0,
             'job_size': [0 for b in sizebins],
          }
 
@@ -250,6 +262,7 @@ def main():
             d['project_summaries'][project]['jobs'] += user['jobs']
             d['project_summaries'][project]['core_hours'] += user['core_hours']
             d['project_summaries'][project]['core_hours_adj'] += user['core_hours_adj']
+            d['project_summaries'][project]['cpu_hours'] += user['cpu_hours']
 
             for (i, b) in enumerate(sizebins):
                d['project_summaries'][project]['job_size'][i] += user['job_size'][i]
@@ -352,7 +365,7 @@ def return_size_adj(record):
 
 
 def summarise_totals(data, total_cores, bins):
-   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl' ]
+   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -361,6 +374,8 @@ def summarise_totals(data, total_cores, bins):
    table = []
    for d in data:
       total_core_hrs += d['date']['core_hours']
+
+      core_hours_adj = sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']])
 
       table.append({
          'Date': d['date']['name'],
@@ -371,6 +386,7 @@ def summarise_totals(data, total_cores, bins):
          '%Utl': percent(d['date']['inv_core_hours'] * sum([d['project_summaries'][p]['core_hours'] for p in d['project_summaries']])),
          'Adj Core Hrs': sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']]),
          'Adj %Utl': percent(d['date']['inv_core_hours'] * sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']])),
+         'Core %Eff': percent(sum([d['project_summaries'][p]['cpu_hours'] for p in d['project_summaries']])/core_hours_adj if core_hours_adj else 0),
          **{ b['name']: sum([d['project_summaries'][p]['job_size'][i] for p in d['project_summaries']]) for i, b in enumerate(bins) },
       })
 
@@ -388,6 +404,8 @@ def summarise_totals(data, total_cores, bins):
       '%Utl': percent(inv_total_core_hours * sum([d['Core Hrs'] for d in table])),
       'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
       'Adj %Utl': percent(inv_total_core_hours * sum([d['Adj Core Hrs'] for d in table])),
+      'Core %Eff': percent(-1),
+      'Mem %Eff': percent(-1),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
