@@ -43,6 +43,7 @@ parser.add_argument('--reports', action='append', type=str, help="What informati
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
 parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
+parser.add_argument('--printrecords', action='store_true', default=False, help="Print records to standard out")
 
 args = parser.parse_args()
 
@@ -184,6 +185,12 @@ def main():
             if record_filter(record, d['date']):
                user = record['owner']
                project = record['project']
+
+               # Print record, if requested
+               if args.printrecords:
+                  for f in sorted(record):
+                     print(f +":", record[f])
+                  print("\n")
 
                # Init data
 
