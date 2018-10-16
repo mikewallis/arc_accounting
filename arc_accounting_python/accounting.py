@@ -392,12 +392,12 @@ def summarise_totals(data, total_cores, bins):
       'Date': 'TOTALS',
       'Projects': len(set([p for d in data for p in d['projects']])),
       'Users': len(set([u for d in data for u in d['users']])),
-      'Jobs': sum([d['Jobs'] for d in table]),
-      'Core Hrs': sum([d['Core Hrs'] for d in table]),
-      '%Utl': percent(sum([d['Core Hrs'] for d in table]), avail_core_hours),
-      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
-      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]), avail_core_hours),
-      'Core %Eff': percent(total_cpu_hours, sum([d['Adj Core Hrs'] for d in table])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
+      'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -444,18 +444,16 @@ def summarise_projectsbydate(data, project, total_cores, bins):
             **{ b['name']: 0 for i, b in enumerate(bins) },
          })
 
-   total_core_hours_adj = sum([d['Adj Core Hrs'] for d in table])
-
    totals = {
       'Date': 'TOTALS',
       'Users': len(set([u for d in data for u in d['projects'].get(project, [])])),
-      'Jobs': sum([d['Jobs'] for d in table]),
-      'Core Hrs': sum([d['Core Hrs'] for d in table]),
-      '%Utl': percent(sum([d['Core Hrs'] for d in table]), avail_core_hours),
-      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
-      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]), avail_core_hours),
-      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]), total_core_hours_adj),
-      'Core %Eff': percent(total_cpu_hours, total_core_hours_adj),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), sum_key(table, 'Adj Core Hrs')),  #DEBUG - no!!!!
+      'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -483,19 +481,19 @@ def summarise_projects(data, total_cores, bins):
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
-      })
+      }),
 
    totals = {
       'Project': 'TOTALS',
       'Parent': '-',
       'Users': len(data['users']),
-      'Jobs': sum([d['Jobs'] for d in table]),
-      'Core Hrs': sum([d['Core Hrs'] for d in table]),
-      '%Utl': percent(sum([d['Core Hrs'] for d in table]), data['date']['core_hours']),
-      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
-      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]), data['date']['core_hours']),
-      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]), core_hours_adj),
-      'Core %Eff': percent(sum([data['project_summaries'][p]['cpu_hours'] for p in data['project_summaries']]), sum([d['Adj Core Hrs'] for d in table])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
+      'Core %Eff': percent(sum([data['project_summaries'][p]['cpu_hours'] for p in data['project_summaries']]), sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -530,13 +528,13 @@ def summarise_users(data, total_cores, bins):
    totals = {
       'Usr': 'TOTALS',
       'Project(s)': '-',
-      'Jobs': sum([d['Jobs'] for d in table]),
-      'Core Hrs': sum([d['Core Hrs'] for d in table]),
-      '%Utl': percent(sum([d['Core Hrs'] for d in table]), data['date']['core_hours']),
-      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
-      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]), data['date']['core_hours']),
-      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]), core_hours_adj),
-      'Core %Eff': percent(sum([data['users'][u]['cpu_hours'] for u in data['users']]), sum([d['Adj Core Hrs'] for d in table])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
+      'Core %Eff': percent(sum([data['users'][u]['cpu_hours'] for u in data['users']]), sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -568,13 +566,13 @@ def summarise_project(data, project, total_cores, bins):
 
    totals = {
       'Usr': 'TOTALS',
-      'Jobs': sum([d['Jobs'] for d in table]),
-      'Core Hrs': sum([d['Core Hrs'] for d in table]),
-      '%Utl': percent(sum([d['Core Hrs'] for d in table]), data['date']['core_hours']),
-      'Adj Core Hrs': sum([d['Adj Core Hrs'] for d in table]),
-      'Adj %Utl': percent(sum([d['Adj Core Hrs'] for d in table]), data['date']['core_hours']),
-      '%Usg': percent(sum([d['Adj Core Hrs'] for d in table]), core_hours_adj),
-      'Core %Eff': percent(sum([data['projects'][project][u]['cpu_hours'] for u in data['projects'][project]]), sum([d['Adj Core Hrs'] for d in table])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
+      'Core %Eff': percent(sum([data['projects'][project][u]['cpu_hours'] for u in data['projects'][project]]), sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -706,6 +704,11 @@ def print_simplestats(data, top_n):
 def percent(num, dom):
    pc = num / dom if dom else 0
    return "{0:.1%}".format(float(pc))
+
+
+# Shortcut to simplify calcs
+def sum_key(data, key):
+   return sum([d[key] for d in data])
 
 
 # Take a range string of format [START][-[END]], where START and END are
