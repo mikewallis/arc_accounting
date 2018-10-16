@@ -29,6 +29,8 @@ parser = argparse.ArgumentParser(description='Report on accounting data')
 parser.add_argument('--dates', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018. Multiple ranges supported.")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue(s) to filter out")
 parser.add_argument('--queues', action='append', type=str, help="Queue(s) to report on")
+parser.add_argument('--users', action='append', type=str, help="Users(s) to report on")
+parser.add_argument('--skipusers', action='append', type=str, help="Users(s) to filter out")
 parser.add_argument('--projects', action='append', type=str, help="Project(s) to report on")
 parser.add_argument('--skipprojects', action='append', type=str, help="Project(s) to filter out")
 parser.add_argument('--parents', action='append', type=str, help="Project parent(s) to report on")
@@ -158,6 +160,8 @@ def main():
    #DEBUG - would be better as a custom parseargs action
    args.skipqueues = commasep_list(args.skipqueues)
    args.queues = commasep_list(args.queues)
+   args.users = commasep_list(args.users)
+   args.skipusers = commasep_list(args.skipusers)
    args.projects = commasep_list(args.projects)
    args.skipprojects = commasep_list(args.skipprojects)
    args.parents = commasep_list(args.parents)
@@ -279,6 +283,10 @@ def record_filter(record, date):
    # - Queue filtering
    if args.skipqueues and record['qname'] in args.skipqueues: return False
    if args.queues and record['qname'] not in args.queues: return False
+
+   # - User filtering
+   if args.skipusers and record['owner'] in args.skipusers: return False
+   if args.users and record['owner'] not in args.users: return False
 
    # - Project filtering
    if args.skipprojects and record['project'] in args.skipprojects: return False
