@@ -97,28 +97,25 @@ queue_project_mapping = {
 
 # Parent of project mappings
 # (if not in table, assumes project is own parent)
-project_parent_mapping = {
-   'minphys': 'ENV',
-   'glocat': 'ENV',
-   'glomap': 'ENV',
-   'tomcat': 'ENV',
-   'palaeo1': 'ENV',
-   'sgpc': 'ENV',
-   'neiss': 'ENV',
+project_parent_regex = [
+   { 'regex': r'^(minphys|glocat|glomap|tomcat|palaeo1|sgpc|neiss)$', 'parent': 'ENV' },
+   { 'regex': r'^(speme|civil)$', 'parent': 'ENG' },
+   { 'regex': r'^(mhd|skyblue|chem|maths|astro|codita)$', 'parent': 'MAPS' },
+   { 'regex': r'^(omics|cryoem)$', 'parent': 'FBS' },
 
-   'speme': 'ENG',
-   'civil': 'ENG',
+   { 'regex': r'^N8HPC_DUR_', 'parent': 'DUR' },
+   { 'regex': r'^N8HPC_LAN_', 'parent': 'LAN' },
+   { 'regex': r'^N8HPC_LDS_', 'parent': 'LDS' },
+   { 'regex': r'^N8HPC_LIV_', 'parent': 'LIV' },
+   { 'regex': r'^N8HPC_MCR_', 'parent': 'MCR' },
+   { 'regex': r'^N8HPC_NCL_', 'parent': 'NCL' },
+   { 'regex': r'^N8HPC_SHE_', 'parent': 'SHE' },
+   { 'regex': r'^N8HPC_YRK_', 'parent': 'YRK' },
+]
 
-   'mhd': 'MAPS',
-   'skyblue': 'MAPS',
-   'chem': 'MAPS',
-   'maths': 'MAPS',
-   'astro': 'MAPS',
-   'codita': 'MAPS',
-
-   'omics': 'FBS',
-   'cryoem': 'FBS',
-}
+# Compile regexes
+for n in project_parent_regex:
+   n['re'] = re.compile(n['regex'])
 
 # Some projects have changed names, or combined with other
 # projects over the years. Combine them by updating old names.
@@ -320,7 +317,7 @@ def record_modify(record):
    record['project'] = project
 
    # Add project parent
-   record['parent'] = project_parent_mapping.get(project, project)
+   record['parent'] = project_to_parent(project)
 
    # Add size and core hour figures
 
@@ -542,7 +539,7 @@ def summarise_projects(data, total_cores, bins):
    for project, d in sorted(data['projects'].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
       table.append({
          'Project': project,
-         'Parent': project_parent_mapping.get(project, project),
+         'Parent': project_to_parent(project),
          'Users': d['users'],
          'Jobs': d['jobs'],
          'Core Hrs': d['core_hours'],
@@ -886,6 +883,14 @@ def commasep_list(data):
       l.extend(data.split(","))
 
    return l
+
+
+def project_to_parent(project):
+   for p in project_parent_regex:
+      r = p['re'].match(project)
+      if r: return p['parent']
+
+   return project
 
 
 # Run program (if we've not been imported)
