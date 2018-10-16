@@ -220,7 +220,7 @@ def main():
                # - count used core hours
                d['projusers'][project][user]['cpu_hours'] += record['cpu'] / float(3600)
 
-               # - count used memory
+               # - count used and blocked memory
                d['projusers'][project][user]['mem_hours'] += record['core_hours'] * record['maxvmem']
                d['projusers'][project][user]['mem_req_hours'] += record['core_hours'] * record['mem_req']
 
