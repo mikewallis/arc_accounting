@@ -410,12 +410,15 @@ def summarise_projectsbydate(data, project, total_cores, bins):
       headers.extend([b['name'] for b in bins])
 
    avail_core_hours = sum([d['date']['core_hours'] for d in data], 0)
+   total_core_hours_adj = 0
    total_cpu_hours = 0
 
    table = []
    for d in data:
       if project in d['projects']:
          core_hours_adj = sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']], 0)
+         total_core_hours_adj += core_hours_adj
+
          total_cpu_hours += d['project_summaries'][project]['cpu_hours']
  
          table.append({
@@ -452,7 +455,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
-      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), sum_key(table, 'Adj Core Hrs')),  #DEBUG - no!!!!
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
