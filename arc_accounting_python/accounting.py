@@ -37,7 +37,7 @@ parser.add_argument('--coreprojects', action='store_true', default=False, help="
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: totals, projects, users, usersbyproject)")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (default: totalsbydate, projects, users, projectbyusers)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
 parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
@@ -133,6 +133,8 @@ def main():
    if not args.dates:
       args.dates = [ '-' ]
 
+   args.dates = commasep_list(args.dates)
+
    # Restrict to the core purchasers of ARC, if requested
    if args.coreprojects:
       args.projects = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
@@ -143,7 +145,10 @@ def main():
 
    # All reports, if not specified
    if not args.reports:
-      args.reports = [ 'totals', 'projectsbydate', 'projects', 'users', 'usersbyproject' ]
+      if len(args.dates) > 1:
+         args.reports = [ 'totalsbydate', 'projectsbydate', 'usersbydate' ]
+      else:
+         args.reports = [ 'projects', 'users', 'projectbyusers' ]
 
    # Job size bins, if not specified
    if not args.sizebins:
@@ -151,7 +156,6 @@ def main():
 
    # Allow comma separated values to indicate arrays
    #DEBUG - would be better as a custom parseargs action
-   args.dates = commasep_list(args.dates)
    args.skipqueues = commasep_list(args.skipqueues)
    args.queues = commasep_list(args.queues)
    args.projects = commasep_list(args.projects)
@@ -360,7 +364,7 @@ def return_size_adj(record):
    return size_adj
 
 
-def summarise_totals(data, total_cores, bins):
+def summarise_totalsbydate(data, total_cores, bins):
    headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
@@ -450,6 +454,62 @@ def summarise_projectsbydate(data, project, total_cores, bins):
    totals = {
       'Date': 'TOTALS',
       'Users': len(set([u for d in data for u in d['projects'].get(project, [])])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
+      'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
+   }
+
+   return headers, table, totals
+
+
+def summarise_usersbydate(data, user, total_cores, bins):
+   headers = [ 'Date', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', '%Usg', 'Core %Eff' ]
+   if bins:
+      headers.extend([b['name'] for b in bins])
+
+   avail_core_hours = sum([d['date']['core_hours'] for d in data])
+   total_core_hours_adj = 0
+   total_cpu_hours = 0
+
+   table = []
+   for d in data:
+      if user in d['users']:
+         core_hours_adj = sum([d['users'][u]['core_hours_adj'] for u in d['users']])
+         total_core_hours_adj += core_hours_adj
+
+         total_cpu_hours += d['users'][user]['cpu_hours']
+ 
+         table.append({
+            'Date': d['date']['name'],
+            'Jobs': d['users'][user]['jobs'],
+            'Core Hrs': d['users'][user]['core_hours'],
+            '%Utl': percent(d['users'][user]['core_hours'], d['date']['core_hours']),
+            'Adj Core Hrs': d['users'][user]['core_hours_adj'],
+            'Adj %Utl': percent(d['users'][user]['core_hours_adj'], d['date']['core_hours']),
+            '%Usg': percent(d['users'][user]['core_hours_adj'], core_hours_adj),
+            'Core %Eff': percent(d['users'][user]['cpu_hours'], d['users'][user]['core_hours_adj']),
+            **{ b['name']: d['users'][user]['job_size'][i] for i, b in enumerate(bins) },
+         })
+      else:
+         table.append({
+            'Date': d['date']['name'],
+            'Jobs': 0,
+            'Core Hrs': 0,
+            '%Utl': percent(0, 0),
+            'Adj Core Hrs': 0,
+            'Adj %Utl': percent(0, 0),
+            '%Usg': percent(0, 0),
+            'Core %Eff': percent(0, 0),
+            **{ b['name']: 0 for i, b in enumerate(bins) },
+         })
+
+   totals = {
+      'Date': 'TOTALS',
       'Jobs': sum_key(table, 'Jobs'),
       'Core Hrs': sum_key(table, 'Core Hrs'),
       '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
@@ -622,11 +682,11 @@ def print_summary(data, total_cores, reports, bins):
          print(" Duration:", (d['date']['end'] - d['date']['start'])//3600, "hours", "Cores:", total_cores)
          print("")
 
-   if 'totals' in reports:
+   if 'totalsbydate' in reports:
       print("=======")
       print("Totals:")
       print("=======\n")
-      print_table(*summarise_totals(data, total_cores, bins))
+      print_table(*summarise_totalsbydate(data, total_cores, bins))
 
    if 'projectsbydate' in reports:
       print("=================")
@@ -640,35 +700,36 @@ def print_summary(data, total_cores, reports, bins):
       print("=============")
       print("Top projects:")
       print("=============\n")
-
       for d in data:
          print("Period:", d['date']['name'],"\n")
-
          print_table(*summarise_projects(d, total_cores, bins))
-
-   ##DEBUG - need a usersbydate table?
 
    if 'users' in reports:
       print("==========")
       print("Top users:")
       print("==========\n")
-
       for d in data:
          print("Period:", d['date']['name'],"\n")
-
          print_simplestats(d['users'], args.limitusers)
          print_table(*summarise_users(d, total_cores, bins))
 
+   if 'usersbydate' in reports:
+      print("=============")
+      print("Users by date:")
+      print("=============\n")
+      for user in set([u for d in data for u in d['users']]):
+         print("User:", user)
+         print_table(*summarise_usersbydate(data, user, total_cores, bins))
+
    ##DEBUG - need a usersbyprojectbydate table?
 
-   if 'usersbyproject' in reports:
+   if 'projectbyusers' in reports:
       print("=====================")
       print("Top users by project:")
       print("=====================\n")
 
       for d in data:
          print("Period:", d['date']['name'],"\n")
-
          for project in sorted(d['projects']):
             print("Project:", project)
             print_simplestats(d['projects'][project], args.limitusers)
