@@ -409,14 +409,14 @@ def summarise_projectsbydate(data, project, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   avail_core_hours = sum([d['date']['core_hours'] for d in data], 0)
+   avail_core_hours = sum([d['date']['core_hours'] for d in data])
    total_core_hours_adj = 0
    total_cpu_hours = 0
 
    table = []
    for d in data:
       if project in d['projects']:
-         core_hours_adj = sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']], 0)
+         core_hours_adj = sum([d['project_summaries'][p]['core_hours_adj'] for p in d['project_summaries']])
          total_core_hours_adj += core_hours_adj
 
          total_cpu_hours += d['project_summaries'][project]['cpu_hours']
@@ -468,7 +468,7 @@ def summarise_projects(data, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   core_hours_adj = sum([data['project_summaries'][p]['core_hours_adj'] for p in data['project_summaries']], 0)
+   core_hours_adj = sum([data['project_summaries'][p]['core_hours_adj'] for p in data['project_summaries']])
 
    table = []
    for project, d in sorted(data['project_summaries'].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
@@ -508,7 +508,7 @@ def summarise_users(data, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   core_hours_adj = sum([data['users'][u]['core_hours_adj'] for u in data['users']], 0)
+   core_hours_adj = sum([data['users'][u]['core_hours_adj'] for u in data['users']])
 
    table = []
    count = 0
@@ -548,7 +548,7 @@ def summarise_project(data, project, total_cores, bins):
    if bins:
       headers.extend([b['name'] for b in bins])
 
-   core_hours_adj = sum([data['projects'][project][u]['core_hours_adj'] for u in data['projects'][project]], 0)
+   core_hours_adj = sum([data['projects'][project][u]['core_hours_adj'] for u in data['projects'][project]])
 
    table = []
    count = 0
