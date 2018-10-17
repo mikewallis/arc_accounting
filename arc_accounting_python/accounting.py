@@ -402,7 +402,7 @@ def return_size_adj(record):
 
 
 def summarise_totalsbydate(data, total_cores, bins):
-   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -437,7 +437,7 @@ def summarise_totalsbydate(data, total_cores, bins):
          '%Utl': percent(sum([d['projects'][p]['core_hours'] for p in d['projects']]), d['date']['core_hours']),
          'Adj Core Hrs': sum([d['projects'][p]['core_hours_adj'] for p in d['projects']]),
          'Adj %Utl': percent(sum([d['projects'][p]['core_hours_adj'] for p in d['projects']]), d['date']['core_hours']),
-         'Wait/Hr': div(wait_hours, core_hours_adj),
+         'Core Hrs/Wait': div(core_hours_adj, wait_hours),
          'Core %Eff': percent(cpu_hours,  core_hours_adj),
          'Mem %Eff': percent(mem_hours, mem_req_hours),
          **{ b['name']: sum([d['projects'][p]['job_size'][i] for p in d['projects']]) for i, b in enumerate(bins) },
@@ -452,7 +452,7 @@ def summarise_totalsbydate(data, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
-      'Wait/Hr': div(total_wait_hours, sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(total_mem_hours, total_mem_req_hours),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
@@ -462,7 +462,7 @@ def summarise_totalsbydate(data, total_cores, bins):
 
 
 def summarise_projectsbydate(data, project, total_cores, bins):
-   headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', '%Usg', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -494,7 +494,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
             '%Utl': percent(d['projects'][project]['core_hours'], d['date']['core_hours']),
             'Adj Core Hrs': d['projects'][project]['core_hours_adj'],
             'Adj %Utl': percent(d['projects'][project]['core_hours_adj'], d['date']['core_hours']),
-            'Wait/Hr': div(d['projects'][project]['wait_hours'], d['projects'][project]['core_hours_adj']),
+            'Core Hrs/Wait': div(d['projects'][project]['core_hours_adj'], d['projects'][project]['wait_hours']),
             '%Usg': percent(d['projects'][project]['core_hours_adj'], core_hours_adj),
             'Core %Eff': percent(d['projects'][project]['cpu_hours'], d['projects'][project]['core_hours_adj']),
             'Mem %Eff': percent(d['projects'][project]['mem_hours'], d['projects'][project]['mem_req_hours']),
@@ -509,7 +509,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
             '%Utl': percent(0, 0),
             'Adj Core Hrs': 0,
             'Adj %Utl': percent(0, 0),
-            'Wait/Hr': 0,
+            'Core Hrs/Wait': 0,
             '%Usg': percent(0, 0),
             'Core %Eff': percent(0, 0),
             'Mem %Eff': percent(0, 0),
@@ -524,7 +524,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
-      'Wait/Hr': div(total_wait_hours, sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(total_mem_hours, total_mem_req_hours),
@@ -535,7 +535,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
 
 
 def summarise_usersbydate(data, user, total_cores, bins):
-   headers = [ 'Date', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', '%Usg', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Date', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -566,7 +566,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
             '%Utl': percent(d['users'][user]['core_hours'], d['date']['core_hours']),
             'Adj Core Hrs': d['users'][user]['core_hours_adj'],
             'Adj %Utl': percent(d['users'][user]['core_hours_adj'], d['date']['core_hours']),
-            'Wait/Hr': div(d['users'][user]['wait_hours'], d['users'][user]['core_hours_adj']),
+            'Core Hrs/Wait': div(d['users'][user]['core_hours_adj'], d['users'][user]['wait_hours']),
             '%Usg': percent(d['users'][user]['core_hours_adj'], core_hours_adj),
             'Core %Eff': percent(d['users'][user]['cpu_hours'], d['users'][user]['core_hours_adj']),
             'Mem %Eff': percent(d['users'][user]['mem_hours'], d['users'][user]['mem_req_hours']),
@@ -580,7 +580,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
             '%Utl': percent(0, 0),
             'Adj Core Hrs': 0,
             'Adj %Utl': percent(0, 0),
-            'Wait/Hr': 0,
+            'Core Hrs/Wait': 0,
             '%Usg': percent(0, 0),
             'Core %Eff': percent(0, 0),
             'Mem %Eff': percent(0, 0),
@@ -594,7 +594,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
-      'Wait/Hr': div(total_wait_hours, sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(total_mem_hours, total_mem_req_hours),
@@ -605,7 +605,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
 
 
 def summarise_projects(data, total_cores, bins):
-   headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', '%Usg', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -622,7 +622,7 @@ def summarise_projects(data, total_cores, bins):
          '%Utl': percent(d['core_hours'], data['date']['core_hours']),
          'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'], data['date']['core_hours']),
-         'Wait/Hr': div(d['wait_hours'], d['core_hours_adj']),
+         'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
@@ -638,7 +638,7 @@ def summarise_projects(data, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
-      'Wait/Hr': div(sum_key(table, 'Wait/Hr'), sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum_key(table, 'Core Hrs/Wait')),
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       'Core %Eff': percent(sum([data['projects'][p]['cpu_hours'] for p in data['projects']]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['projects'][p]['mem_hours'] for p in data['projects']]), sum([data['projects'][p]['mem_req_hours'] for p in data['projects']])),
@@ -649,7 +649,7 @@ def summarise_projects(data, total_cores, bins):
 
 
 def summarise_users(data, total_cores, bins):
-   headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', '%Usg', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -668,7 +668,7 @@ def summarise_users(data, total_cores, bins):
          '%Utl': percent(d['core_hours'], data['date']['core_hours']),
          'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'], data['date']['core_hours']),
-         'Wait/Hr': div(d['wait_hours'], d['core_hours_adj']),
+         'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
@@ -683,7 +683,7 @@ def summarise_users(data, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
-      'Wait/Hr': div(sum_key(table, 'Wait/Hr'), sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum_key(table, 'Core Hrs/Wait')),
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       'Core %Eff': percent(sum([data['users'][u]['cpu_hours'] for u in data['users']]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['users'][u]['mem_hours'] for u in data['users']]), sum([data['users'][u]['mem_req_hours'] for u in data['users']])),
@@ -693,7 +693,7 @@ def summarise_users(data, total_cores, bins):
    return headers, table, totals
 
 def summarise_project(data, project, total_cores, bins):
-   headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Wait/Hr', '%Usg', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -711,7 +711,7 @@ def summarise_project(data, project, total_cores, bins):
          '%Utl': percent(d['core_hours'], data['date']['core_hours']),
          'Adj Core Hrs': d['core_hours_adj'],
          'Adj %Utl': percent(d['core_hours_adj'], data['date']['core_hours']),
-         'Wait/Hr': div(d['wait_hours'], d['core_hours_adj']),
+         'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
          '%Usg': percent(d['core_hours_adj'], core_hours_adj),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
@@ -725,7 +725,7 @@ def summarise_project(data, project, total_cores, bins):
       '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
       'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
       'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
-      'Wait/Hr': div(sum_key(table, 'Wait/Hr'), sum_key(table, 'Adj Core Hrs')),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum_key(table, 'Core Hrs/Wait')),
       '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
       'Core %Eff': percent(sum([data['projusers'][project][u]['cpu_hours'] for u in data['projusers'][project]]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['projusers'][project][u]['mem_hours'] for u in data['projusers'][project]]), sum([data['projusers'][project][u]['mem_req_hours'] for u in data['projusers'][project]])),
