@@ -226,9 +226,7 @@ def main():
                d['projusers'][project][user]['mem_req_hours'] += record['core_hours'] * record['mem_req']
 
                # - count wait time
-               wait = (record['start_time'] - record['submission_time']) / float(3600)
-               if wait >= 0.0:
-                  d['projusers'][project][user]['wait_hours'] += wait
+               d['projusers'][project][user]['wait_hours'] += max((record['end_time'] - record['submission_time']) / float(3600), 0)
 
                # - job size distribution
                for (i, b) in enumerate(sizebins):
