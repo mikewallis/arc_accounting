@@ -382,6 +382,7 @@ def return_size_adj(record):
          r = b['re'].match(record['hostname'])
          if r:
             mem_core = b['mpc']
+            break
 
    # - obtain memory request
    mem_req = sge.category_resource(record['category'], 'h_vmem')
