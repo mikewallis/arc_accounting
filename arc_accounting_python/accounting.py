@@ -784,7 +784,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=================")
       print("Projects by date:")
       print("=================\n")
-      for project in set([p for d in data for p in d['projusers']]):
+      for project in sorted(set([p for d in data for p in d['projusers']])):
          print("Project:", project)
          print_table(*summarise_projectsbydate(data, project, total_cores, bins))
 
@@ -809,7 +809,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=============")
       print("Users by date:")
       print("=============\n")
-      for user in set([u for d in data for u in d['users']]):
+      for user in sorted(set([u for d in data for u in d['users']])):
          print("User:", user)
          print_table(*summarise_usersbydate(data, user, total_cores, bins))
 
