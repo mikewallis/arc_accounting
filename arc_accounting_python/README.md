@@ -21,6 +21,9 @@ service's accounting file to an appropriate location first):
       --accountingfile=/tmp/issmcd/accounting_arc3 \
       --accountingfile=/tmp/issmcd/accounting_arc2
 
+Added '--bymonth' or '--byyear' to see how usage varies within the date
+range.
+
 See "./accounting --help" for more details. All arguments are optional.
 
 Alternatively, program can be imported into an interactive python session:
