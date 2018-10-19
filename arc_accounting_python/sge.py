@@ -104,7 +104,15 @@ def records(accounting = os.environ["SGE_ROOT"] +
             filter = None,
             modify = None,
           ):
-   for line in open_file(accounting):
+
+   # Iterate non-strings directly, as we may be tailing a stram
+   # of accounting data where the parent has open/close control
+   if type("") == type(accounting):
+      f = open_file(accounting)
+   else:
+      f = accounting
+
+   for line in f:
       r = record_def.match(line)
       if r:
          d = r.groupdict()
