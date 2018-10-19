@@ -1,0 +1,58 @@
+# Commands to create an appropriate database for feed_accounting in MySQL/MariaDB
+
+# Note: 'group' is a reserved word, so 'grp' used instead. 
+ 
+create table accounting_sge( 
+   service VARCHAR(32), 
+   record INT UNSIGNED, 
+   qname VARCHAR(1024), 
+   hostname VARCHAR(1024), 
+   grp VARCHAR(1024), 
+   owner VARCHAR(1024), 
+   job_name VARCHAR(1024), 
+   job_number INT UNSIGNED, 
+   account VARCHAR(1024), 
+   priority DOUBLE, 
+   submission_time INT UNSIGNED, 
+   start_time INT UNSIGNED, 
+   end_time INT UNSIGNED, 
+   failed INT, 
+   exit_status INT, 
+   ru_wallclock DOUBLE, 
+   ru_utime DOUBLE, 
+   ru_stime DOUBLE, 
+   ru_maxrss DOUBLE, 
+   ru_ixrss DOUBLE, 
+   ru_ismrss DOUBLE, 
+   ru_idrss DOUBLE, 
+   ru_isrss DOUBLE, 
+   ru_minflt DOUBLE, 
+   ru_majflt DOUBLE, 
+   ru_nswap DOUBLE, 
+   ru_inblock DOUBLE, 
+   ru_oublock DOUBLE, 
+   ru_msgsnd DOUBLE, 
+   ru_msgrcv DOUBLE, 
+   ru_nsignals DOUBLE, 
+   ru_nvcsw DOUBLE, 
+   ru_nivcsw DOUBLE, 
+   project VARCHAR(1024), 
+   department VARCHAR(1024), 
+   granted_pe VARCHAR(1024), 
+   slots INT UNSIGNED, 
+   task_number INT, 
+   cpu DOUBLE, 
+   mem DOUBLE, 
+   io DOUBLE, 
+   category VARCHAR(1024), 
+   iow DOUBLE, 
+   pe_taskid VARCHAR(1024), 
+   maxvmem DOUBLE, 
+   arid INT UNSIGNED, 
+   ar_sub_time INT UNSIGNED 
+); 
+ 
+ 
+CREATE UNIQUE INDEX record ON accounting_sge (service, record); 
+CREATE INDEX job_number ON accounting_sge (service, job_number); 
+
