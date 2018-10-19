@@ -85,6 +85,8 @@ def main():
 
    syslog.openlog()
 
+   # Try connecting to database and processing records.
+   # Retry after a delay if there's a failure.
    while True:
       try:
          syslog.syslog("Inserting new accounting data")
@@ -99,23 +101,32 @@ def main():
          syslog.syslog("Found " + str(max_record) + " old " + args.service + " records")
 
          # Insert new records
-         insert = {}
-         for (i, record) in enumerate(sge.records(accounting=args.accountingfile)):
-            if i >= max_record:
-               if 'start' not in insert: insert['start'] = i
-               insert['end'] = i
+         fh = open(args.accountingfile)
+         record_num = 0
 
-               record['service'] = args.service
-               record['record'] = i
-               record['grp'] = record['group']
-               cursor.execute(add_record, record)
+         # - Grab next bunch of accounting records
+         while True:
+            insert = {}
 
-         syslog.syslog("Inserting new " + args.service + " records " + str(insert['start']) + " to " + str(insert['end']))
+            # - Process each waiting line
+            for record in sge.records(accounting=fh):
+               if record_num >= max_record:
+                  if 'start' not in insert: insert['start'] = record_num
+                  insert['end'] = record_num
 
-         # Commit
-         db.commit()
-         cursor.close()
-         db.close()
+                  record['service'] = args.service
+                  record['record'] = record_num
+                  record['grp'] = record['group']
+                  cursor.execute(add_record, record)
+
+               record_num += 1
+
+            # - Commit bunch
+            if 'start' in insert:
+               syslog.syslog("Inserting new " + args.service + " records " + str(insert['start']) + " to " + str(insert['end']))
+               db.commit()
+
+            time.sleep(args.sleep)
       except:
          syslog.syslog("Database insert failed" + str(sys.exc_info()))
 
