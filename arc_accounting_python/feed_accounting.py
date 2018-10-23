@@ -12,6 +12,7 @@ import sge
 import mysql.connector as mariadb
 import syslog
 import time
+import yaml
 
 
 # Initialise data
@@ -71,13 +72,19 @@ def main():
    parser.add_argument('--service', action='store', type=str, help="Service name to tag records")
    parser.add_argument('--accountingfile', action='store', type=str, help="Accounting file to read from")
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
-   parser.add_argument('--credfile', action='store', type=str, help="JSON credential file")
+   parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    args = parser.parse_args()
 
    if not args.service:
       raise SystemExit("Error: provide a service name argument")
 
-   add_record = "INSERT INTO accounting_sge (service, " + \
+   if args.credfile:
+      with open(args.credfile, 'r') as stream:
+         credentials = yaml.safe_load(stream)
+   else:
+      raise SystemExit("Error: provide a database credential file")
+
+   sge_add_record = "INSERT INTO accounting_sge (service, " + \
       ", ".join([f for f in fields]) + \
       ") VALUES (%(service)s, " + \
       ", ".join(['%(' + f + ')s' for f in fields]) + \
@@ -90,7 +97,7 @@ def main():
    while True:
       try:
          # Connect to database
-         db = mariadb.connect(database='test_accounting')
+         db = mariadb.connect(**credentials)
          cursor = db.cursor()
 
          # Initialise state
@@ -125,7 +132,7 @@ def main():
                      record['service'] = args.service
                      record['record'] = record_num
                      record['grp'] = record['group']
-                     cursor.execute(add_record, record)
+                     cursor.execute(sge_add_record, record)
 
                   record_num += 1
 
