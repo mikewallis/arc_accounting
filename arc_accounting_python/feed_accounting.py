@@ -89,46 +89,56 @@ def main():
    # Retry after a delay if there's a failure.
    while True:
       try:
-         syslog.syslog("Inserting new accounting data")
-
          # Connect to database
          db = mariadb.connect(database='test_accounting')
          cursor = db.cursor()
 
-         # Determine number of old records
-         cursor.execute("SELECT count(*) FROM accounting_sge WHERE service = %s", (args.service, ))
-         max_record = cursor.fetchall()[0][0]
-         syslog.syslog("Found " + str(max_record) + " old " + args.service + " records")
+         # Initialise state
 
-         # Insert new records
-         fh = open(args.accountingfile)
-         record_num = 0
+         if args.accountingfile:
+            # Determine number of old sge records
+            cursor.execute(
+               "SELECT count(*) FROM accounting_sge WHERE service = %s",
+               (args.service, ),
+            )
+            max_record = cursor.fetchall()[0][0]
+            syslog.syslog("Found " + str(max_record) + " old " + \
+                          args.service + " records")
 
-         # - Grab next bunch of accounting records
+            # Open input files and initialise state
+            fh = open(args.accountingfile)
+            record_num = 0
+
+         # Process records as they come in
          while True:
-            insert = {}
 
-            # - Process each waiting line
-            for record in sge.records(accounting=fh):
-               if record_num >= max_record:
-                  if 'start' not in insert: insert['start'] = record_num
-                  insert['end'] = record_num
+            # SGE accounting records
+            if args.accountingfile:
+               insert = {}
 
-                  record['service'] = args.service
-                  record['record'] = record_num
-                  record['grp'] = record['group']
-                  cursor.execute(add_record, record)
+               # - Process any waiting lines
+               for record in sge.records(accounting=fh):
+                  if record_num >= max_record:
+                     if 'start' not in insert: insert['start'] = record_num
+                     insert['end'] = record_num
 
-               record_num += 1
+                     record['service'] = args.service
+                     record['record'] = record_num
+                     record['grp'] = record['group']
+                     cursor.execute(add_record, record)
 
-            # - Commit bunch
-            if 'start' in insert:
-               syslog.syslog("Inserting new " + args.service + " records " + str(insert['start']) + " to " + str(insert['end']))
-               db.commit()
+                  record_num += 1
+
+               # - Commit bunch
+               if 'start' in insert:
+                  syslog.syslog("Inserting new " + args.service + \
+                         " records " + str(insert['start']) + " to " + \
+                         str(insert['end']))
+                  db.commit()
 
             time.sleep(args.sleep)
       except:
-         syslog.syslog("Database insert failed" + str(sys.exc_info()))
+         syslog.syslog("Processing failed" + str(sys.exc_info()))
 
       time.sleep(args.sleep)
 
