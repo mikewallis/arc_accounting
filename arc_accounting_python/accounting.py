@@ -814,6 +814,15 @@ def print_table(headers, data, totals):
 
 def print_summary(data, total_cores, reports, bins):
 
+   print("Fields:")
+   print("- %Utl: proportion of total core hours available")
+   print("- Adj *: figure adjusted to account for large memory requests")
+   print("- Core Hrs/Wait: sum(adj core hours) / sum(elapsed hours from submit to finish)")
+   print("- Wall %Acc: accuracy of user h_rt request (100% == perfect, 200% == used half requested time)")
+   print("- %Eff: efficiency - how much of a allocated resource was actually used")
+   print("- Numbers: how many core hours were clocked up by jobs with that number of cores")
+   print("")
+
    if 'all' in reports or 'totalsbydate' in reports:
       print("=======")
       print("Totals:")
