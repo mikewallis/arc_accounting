@@ -52,7 +52,28 @@ create table accounting_sge(
    ar_sub_time INT UNSIGNED 
 ); 
  
- 
 CREATE UNIQUE INDEX record ON accounting_sge (service, record); 
 CREATE INDEX job_number ON accounting_sge (service, job_number); 
 
+# Table to maintain bookmarks of where we are in our data sources
+create table data_source_state( 
+   host VARCHAR(32),
+   name VARCHAR(1024),
+   active BOOL,
+   state INT UNSIGNED
+);
+
+# Table to contain syslog data
+create table syslog_data(
+   cluster VARCHAR(32), 
+   job VARCHAR(32),
+   mpirun_file VARCHAR(10240),
+   alloc VARCHAR(10240),
+   nodes_nodes INT UNSIGNED,
+   nodes_np INT UNSIGNED,
+   nodes_ppn INT UNSIGNED,
+   nodes_tpp INT UNSIGNED,
+   modules VARCHAR(10240)
+);
+
+CREATE UNIQUE INDEX record on syslog_data (cluster, job);
