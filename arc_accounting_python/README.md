@@ -4,7 +4,7 @@ language. Sorry.
 sge.py is a reusable library of gridengine-related routines.  accounting
 reports on gridengine accounting data
 
-Mostly tested under python3, but should work under python2.
+Requires python 3.5 or higher.
 
 You may need to install following packages:
 
