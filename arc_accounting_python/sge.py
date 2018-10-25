@@ -86,10 +86,10 @@ node_type_def = re.compile(r"""
 def open_file(file):
    if file.endswith('.gz'):
       import gzip
-      return gzip.open(file, 'r')
+      return gzip.open(file, 'rt')
    elif file.endswith('.bz2'):
       import bz2
-      return bz2.BZ2File(file, 'r')
+      return bz2.open(file, 'rt')
    else:
       return open(file, 'r')
 
