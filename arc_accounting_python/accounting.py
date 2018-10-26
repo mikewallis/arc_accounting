@@ -106,14 +106,14 @@ project_parent_regex = [
    { 'regex': r'^(mhd|skyblue|chem|maths|astro|codita)$', 'parent': 'MAPS' },
    { 'regex': r'^(omics|cryoem)$', 'parent': 'FBS' },
 
-   { 'regex': r'^N8HPC_DUR_', 'parent': 'DUR' },
-   { 'regex': r'^N8HPC_LAN_', 'parent': 'LAN' },
-   { 'regex': r'^N8HPC_LDS_', 'parent': 'LDS' },
-   { 'regex': r'^N8HPC_LIV_', 'parent': 'LIV' },
-   { 'regex': r'^N8HPC_MCR_', 'parent': 'MCR' },
-   { 'regex': r'^N8HPC_NCL_', 'parent': 'NCL' },
-   { 'regex': r'^N8HPC_SHE_', 'parent': 'SHE' },
-   { 'regex': r'^N8HPC_YRK_', 'parent': 'YRK' },
+   { 'regex': r'^(N8HPC_DUR_|dur$)', 'parent': 'DUR' },
+   { 'regex': r'^(N8HPC_LAN_|lan$)', 'parent': 'LAN' },
+   { 'regex': r'^(N8HPC_LDS_|lds$)', 'parent': 'LDS' },
+   { 'regex': r'^(N8HPC_LIV_|liv$)', 'parent': 'LIV' },
+   { 'regex': r'^(N8HPC_MCR_|mcr$)', 'parent': 'MCR' },
+   { 'regex': r'^(N8HPC_NCL_|ncl$)', 'parent': 'NCL' },
+   { 'regex': r'^(N8HPC_SHE_|she$)', 'parent': 'SHE' },
+   { 'regex': r'^(N8HPC_YRK_|yrk$)', 'parent': 'YRK' },
 ]
 
 # Compile regexes
@@ -124,6 +124,9 @@ for n in project_parent_regex:
 # projects over the years. Combine them by updating old names.
 project_project_mapping = {
    'ISS': 'ARC',
+   'NONE': 'ARC',
+   'admin': 'ARC',
+   'users': 'ARC',
    'UKMHD': 'MAPS',
 }
 
