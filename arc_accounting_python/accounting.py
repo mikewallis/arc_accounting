@@ -101,10 +101,11 @@ queue_project_mapping = {
 # Parent of project mappings
 # (if not in table, assumes project is own parent)
 project_parent_regex = [
-   { 'regex': r'^(minphys|glocat|glomap|tomcat|palaeo1|sgpc|neiss)$', 'parent': 'ENV' },
+   { 'regex': r'^(minphys|glocat|glomap|tomcat|palaeo1|sgpc|neiss|CONSUMER)$', 'parent': 'ENV' },
    { 'regex': r'^(speme|civil)$', 'parent': 'ENG' },
    { 'regex': r'^(mhd|skyblue|chem|maths|astro|codita)$', 'parent': 'MAPS' },
    { 'regex': r'^(omics|cryoem)$', 'parent': 'FBS' },
+   { 'regex': r'^MEDICAL$', 'parent': 'MEDH' },
 
    { 'regex': r'^(N8HPC_DUR_|dur$)', 'parent': 'DUR' },
    { 'regex': r'^(N8HPC_LAN_|lan$)', 'parent': 'LAN' },
