@@ -128,6 +128,7 @@ project_project_mapping = {
    'admin': 'ARC',
    'users': 'ARC',
    'UKMHD': 'MAPS',
+   'NONMEDICAL': 'OTHER',
 }
 
 # Routines
