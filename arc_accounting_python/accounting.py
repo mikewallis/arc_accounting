@@ -321,7 +321,7 @@ def main():
 
 def record_filter(record, date):
    # - Time filtering
-   if record['end_time'] < date['start'] or record['start_time'] >= date['end']: return False
+   if record['end_time'] < date['start'] or record['end_time'] >= date['end']: return False
 
    # - Queue filtering
    if args.skipqueues and record['qname'] in args.skipqueues: return False
