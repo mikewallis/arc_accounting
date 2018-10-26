@@ -12,7 +12,7 @@ import re
 record_def = re.compile(r"""
    (?P<qname>[^:#]+)
    :(?P<hostname>[^:]+)
-   :(?P<group>[^:]+)
+   :(?P<grp>[^:]+)
    :(?P<owner>[^:]+)
    :(?P<job_name>[^:]+)
    :(?P<job_number>[^:]+)
