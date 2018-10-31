@@ -73,7 +73,10 @@ create table syslog_data(
    nodes_np INT UNSIGNED,
    nodes_ppn INT UNSIGNED,
    nodes_tpp INT UNSIGNED,
-   modules VARCHAR(10240)
+   modules VARCHAR(10240),
+   class_parallel VARCHAR(8),
+   class_ptype VARCHAR(16),
+   class_app VARCHAR(32)
 );
 
 CREATE UNIQUE INDEX record on syslog_data (cluster, job);
