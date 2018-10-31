@@ -175,6 +175,9 @@ def main():
 
                   # Update fields according to syslog data
                   if record['type'] == "mpirun":
+                     # DEBUG: migrate to 3rd normal form, allowing retrieval
+                     # of jobs with a given mpirun file.
+
                      # Add new mpirun file, comma separated (squash duplicates)
                      if sql[0].get('mpirun_file', None):
                         record['mpirun_file'] = ",".join(sorted(set([*sql[0]['mpirun_file'].split(','), record['mpirun_file']])))
@@ -206,6 +209,10 @@ def main():
 
                   elif record['type'] == "sgemodules" or \
                        record['type'] == "module load":
+
+                     # DEBUG: migrate to 3rd normal form, allowing retrieval
+                     # of jobs with a given module loaded.
+
 #                     print("module load", record)
 
                      if record['modules']:
