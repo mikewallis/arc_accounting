@@ -233,13 +233,10 @@ def main():
                      if sql[0].get('coproc_names', None):
                         record['coproc_names'] = ",".join(sorted(set([*sql[0]['coproc_names'].split(','), record['coproc_names']])))
 
-                     # Skip if this is a record we've not seen before
+                     # Skip if this is a record we've seen before
                      if record['coproc_names'] == sql[0].get('coproc_names', None): continue
 
-                     # New record: add to stats
-                     # - convert memory sizes from MiB to B
-                     # - convert % * seconds to seconds
-
+                     # Convert gpu stats to coproc stats and add to record
                      record['coproc_max_mem'] = sum([1024*1024*int(record['coproc_max_mem']), sql[0]['coproc_max_mem']]) # bytes
                      record['coproc_cpu'] = sum([float(record['coproc_cpu'])/100, sql[0]['coproc_cpu']]) # s
                      record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql[0]['coproc_mem']]) # Gib * s
