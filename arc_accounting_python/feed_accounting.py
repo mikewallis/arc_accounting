@@ -93,13 +93,13 @@ def main():
       ", ".join(['%(' + f + ')s' for f in fields]) + \
       ")"
 
-   syslog_select_record = "SELECT * FROM syslog_data WHERE cluster = %(cluster)s AND job = %(job)s"
-   syslog_add_record = "INSERT INTO syslog_data (cluster, job) VALUES (%(cluster)s, %(job)s)"
-   syslog_update_mpirun = "UPDATE syslog_data SET mpirun_file=%(mpirun_file)s WHERE cluster = %(cluster)s AND job = %(job)s"
-   syslog_update_sgealloc = "UPDATE syslog_data SET alloc=%(alloc)s WHERE cluster = %(cluster)s AND job = %(job)s"
-   syslog_update_sgenodes = "UPDATE syslog_data SET nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s WHERE cluster = %(cluster)s AND job = %(job)s"
-   syslog_update_modules = "UPDATE syslog_data SET modules=%(modules)s WHERE cluster = %(cluster)s AND job = %(job)s"
-   syslog_update_coproc = "UPDATE syslog_data SET coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE cluster = %(cluster)s AND job = %(job)s"
+   syslog_select_record = "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s"
+   syslog_add_record = "INSERT INTO syslog_data (service, job) VALUES (%(service)s, %(job)s)"
+   syslog_update_mpirun = "UPDATE syslog_data SET mpirun_file=%(mpirun_file)s WHERE service = %(service)s AND job = %(job)s"
+   syslog_update_sgealloc = "UPDATE syslog_data SET alloc=%(alloc)s WHERE service = %(service)s AND job = %(job)s"
+   syslog_update_sgenodes = "UPDATE syslog_data SET nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s WHERE service = %(service)s AND job = %(job)s"
+   syslog_update_modules = "UPDATE syslog_data SET modules=%(modules)s WHERE service = %(service)s AND job = %(job)s"
+   syslog_update_coproc = "UPDATE syslog_data SET coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE service = %(service)s AND job = %(job)s"
 
    syslog.openlog()
 
@@ -164,6 +164,9 @@ def main():
 
                # - Process any waiting lines
                for record in syslog_records(file=s_fh):
+
+                  # Allocate to service
+                  record['service'] = args.service
 
                   # Retrieve existing record
                   cursor.execute(syslog_select_record, record)
@@ -354,15 +357,11 @@ def syslog_records(file):
 
          for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgemoduleload_def, sgegpustats_def ]:
             r_match = r_def.match(r['data'])
+
             if r_match:
                d_match = r_match.groupdict()
 
-               ##DEBUG - some records don't have a cluster yet
-               d_match['cluster'] = 'arc3_prod'
-
-               if d_match.get('cluster', False) and \
-                  d_match.get('job', False):
-
+               if d_match.get('job', False):
                   yield({ **d, **d_match })
                   break
 

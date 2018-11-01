@@ -65,7 +65,7 @@ create table data_source_state(
 
 # Table to contain syslog data
 create table syslog_data(
-   cluster VARCHAR(32), 
+   service VARCHAR(32), 
    job VARCHAR(32),
    mpirun_file VARCHAR(10240),
    alloc VARCHAR(10240),
@@ -84,4 +84,4 @@ create table syslog_data(
    class_app VARCHAR(32)
 );
 
-CREATE UNIQUE INDEX record on syslog_data (cluster, job);
+CREATE UNIQUE INDEX record on syslog_data (service, job);
