@@ -140,6 +140,11 @@ def main():
    if not args.dates:
       args.dates = [ '-' ]
 
+   if '-' in args.dates:
+      print("WARNING: no date specified, will be for all time")
+      if args.byyear or args.bymonth:
+         print("WARNING: byyear/bymonth specified, will be a lot of output")
+
    # Parse date argument(s)
    global dates
    dates = parse_startend(commasep_list(args.dates))
