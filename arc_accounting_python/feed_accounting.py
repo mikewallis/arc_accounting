@@ -75,6 +75,7 @@ def main():
    parser.add_argument('--syslogfile', action='store', type=str, help="Syslog file to read from")
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
+   parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
    args = parser.parse_args()
 
    if not args.service:
@@ -185,18 +186,14 @@ def main():
 
                      # Update record (if we've changed it)
                      if sql[0]['mpirun_file'] != record['mpirun_file']:
-#                        print("update mpirun file", record['job'], record['mpirun_file'])
+                        if args.debug: print(record['job'], "update mpirun file")
                         cursor.execute(syslog_update_mpirun, record)
-#                     else:
-#                        print("SKIP mpirun")
 
                   elif record['type'] == "sgealloc":
                      if record['alloc']:
                         if sql[0]['alloc'] != record['alloc']:
-#                           print("update sgealloc", sql, record)
+                           if args.debug: print(record['job'], "update sgealloc")
                            cursor.execute(syslog_update_sgealloc, record)
-#                        else:
-#                           print("SKIP sgealloc")
 
                   elif record['type'] == "sgenodes":
                      if record['nodes_nodes']:
@@ -205,7 +202,7 @@ def main():
                            sql[0]['nodes_ppn'] != int(record['nodes_ppn']) or \
                            sql[0]['nodes_tpp'] != int(record['nodes_tpp']):
 
-#                           print("update sgenodes",sql,record)
+                           if args.debug: print(record['job'], "update sgenodes")
                            cursor.execute(syslog_update_sgenodes, record)
 
                   elif record['type'] == "sgemodules" or \
@@ -213,8 +210,6 @@ def main():
 
                      # DEBUG: migrate to 3rd normal form, allowing retrieval
                      # of jobs with a given module loaded.
-
-#                     print("module load", record)
 
                      if record['modules']:
                         m = record['modules'].split(':')
@@ -225,7 +220,7 @@ def main():
                         record['modules'] = ','.join(sorted(set(m)))
 
                         if sql[0]['modules'] != record['modules']:
-#                           print("update modules", record)
+                           if args.debug: print(record['job'], "update modules")
                            cursor.execute(syslog_update_modules, record)
 
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
@@ -247,7 +242,7 @@ def main():
                      record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql[0]['coproc_mem']]) # Gib * s
                      record['coproc_maxvmem'] = sum([1024*1024*int(record['coproc_maxvmem']), sql[0]['coproc_maxvmem']]) # bytes
 
-                     print("update gpu stats")
+                     if args.debug: print(record['job'], "update gpu stats")
                      cursor.execute(syslog_update_coproc, record)
 
                   else:
