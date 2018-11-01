@@ -98,6 +98,7 @@ def main():
    syslog_update_sgealloc = "UPDATE syslog_data SET alloc=%(alloc)s WHERE cluster = %(cluster)s AND job = %(job)s"
    syslog_update_sgenodes = "UPDATE syslog_data SET nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s WHERE cluster = %(cluster)s AND job = %(job)s"
    syslog_update_modules = "UPDATE syslog_data SET modules=%(modules)s WHERE cluster = %(cluster)s AND job = %(job)s"
+   syslog_update_coproc = "UPDATE syslog_data SET coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE cluster = %(cluster)s AND job = %(job)s"
 
    syslog.openlog()
 
@@ -227,6 +228,28 @@ def main():
 #                           print("update modules", record)
                            cursor.execute(syslog_update_modules, record)
 
+                  elif record['type'] == "sge-allocator: Resource stats nvidia":
+
+                     record['coproc_names'] = record['host'] + ":" + record['name']
+
+                     if sql[0].get('coproc_names', None):
+                        record['coproc_names'] = ",".join(sorted(set([*sql[0]['coproc_names'].split(','), record['coproc_names']])))
+
+                     # Skip if this is a record we've not seen before
+                     if record['coproc_names'] == sql[0].get('coproc_names', None): continue
+
+                     # New record: add to stats
+                     # - convert memory sizes from MiB to B
+                     # - convert % * seconds to seconds
+
+                     record['coproc_max_mem'] = sum([1024*1024*int(record['coproc_max_mem']), sql[0]['coproc_max_mem']]) # bytes
+                     record['coproc_cpu'] = sum([float(record['coproc_cpu'])/100, sql[0]['coproc_cpu']]) # s
+                     record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql[0]['coproc_mem']]) # Gib * s
+                     record['coproc_maxvmem'] = sum([1024*1024*int(record['coproc_maxvmem']), sql[0]['coproc_maxvmem']]) # bytes
+
+                     print("update gpu stats")
+                     cursor.execute(syslog_update_coproc, record)
+
                   else:
                      print("What the?", record['type'])
 
@@ -311,6 +334,20 @@ sgemoduleload_def = re.compile(r"""
    \((?P<modules>[^)]*)\)
 """, re.VERBOSE)
 
+# sge-allocator gpu stats data:
+# sge-allocator: Resource stats nvidia pid=81962 job=700000.1 secs=1684 name=3 model=coproc_p100 poll=10 dev=1 max_mem=12193 samples=167 sm=0 mem=0 enc=0 dec=0 fb=0 maxfb=0 bar1=3340 maxbar1=2
+
+sgegpustats_def = re.compile(r"""
+   (?P<type>sge-allocator:\s+Resource\s+stats\s+nvidia).*
+   job=(?P<job>\S+)\s+.*
+   secs=(?P<secs>\S+)\s+.*
+   name=(?P<name>\S+)\s+.*
+   max_mem=(?P<coproc_max_mem>\S+)\s+.*
+   sm=(?P<coproc_cpu>\S+)\s+.*
+   fb=(?P<coproc_mem>\S+)\s+.*
+   maxfb=(?P<coproc_maxvmem>\S+)
+""", re.VERBOSE)
+
 # Return syslog records we are interested in
 def syslog_records(file):
    for line in file:
@@ -320,7 +357,7 @@ def syslog_records(file):
 
          # Process different types of record:
 
-         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgemoduleload_def ]:
+         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgemoduleload_def, sgegpustats_def ]:
             r_match = r_def.match(r['data'])
             if r_match:
                d_match = r_match.groupdict()

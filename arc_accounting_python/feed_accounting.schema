@@ -74,6 +74,11 @@ create table syslog_data(
    nodes_ppn INT UNSIGNED,
    nodes_tpp INT UNSIGNED,
    modules VARCHAR(10240),
+   coproc_names VARCHAR(10240),
+   coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_maxvmem DOUBLE NOT NULL DEFAULT 0.0,
    class_parallel VARCHAR(8),
    class_ptype VARCHAR(16),
    class_app VARCHAR(32)
