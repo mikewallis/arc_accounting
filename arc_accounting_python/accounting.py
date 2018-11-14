@@ -140,6 +140,9 @@ def main():
    if not args.dates:
       args.dates = [ '-' ]
 
+   # Turn dates arg into array
+   args.dates = commasep_list(args.dates)
+
    if '-' in args.dates:
       print("WARNING: no date specified, will be for all time")
       if args.byyear or args.bymonth:
