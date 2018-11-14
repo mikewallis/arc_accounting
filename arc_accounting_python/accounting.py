@@ -461,7 +461,7 @@ def return_size_adj(record):
 
 
 def summarise_totalsbydate(data, total_cores, bins):
-   headers = [ 'Date', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Date', 'Parents', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -497,6 +497,7 @@ def summarise_totalsbydate(data, total_cores, bins):
 
       table.append({
          'Date': d['date']['name'],
+         'Parents': len({project_to_parent(p) for p in d['projects']}),
          'Projects': len(d['projects']),
          'Users': len(d['users']),
          'Jobs': sum([d['projects'][p]['jobs'] for p in d['projects']]),
@@ -513,6 +514,7 @@ def summarise_totalsbydate(data, total_cores, bins):
 
    totals = {
       'Date': 'TOTALS',
+      'Parents': len({project_to_parent(p) for d in data for p in d['projects']}),
       'Projects': len(set([p for d in data for p in d['projusers']])),
       'Users': len(set([u for d in data for u in d['users']])),
       'Jobs': sum_key(table, 'Jobs'),
