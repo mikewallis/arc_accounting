@@ -162,9 +162,9 @@ def main():
    # All reports, if not specified
    if not args.reports:
       if len(dates) > 1:
-         args.reports = [ 'totalsbydate', 'projectsbydate', 'usersbydate' ]
+         args.reports = [ 'totalsbydate', 'parentsbydate', 'projectsbydate', 'usersbydate' ]
       else:
-         args.reports = [ 'projects', 'users', 'projectbyusers' ]
+         args.reports = [ 'parents', 'projects', 'users', 'projectbyusers' ]
 
    # Job size bins, if not specified
    if not args.sizebins:
