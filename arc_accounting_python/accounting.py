@@ -39,7 +39,7 @@ parser.add_argument('--coreprojects', action='store_true', default=False, help="
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (all, projects, users, projectbyusers, totalsbydate, projectsbydate, usersbydate)")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (all, parents, projects, users, projectbyusers, totalsbydate, parentsbydate, projectsbydate, usersbydate)")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
 parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
@@ -188,7 +188,7 @@ def main():
    sizebins = parse_startend(args.sizebins, type='int')
 
    # Initialise our main data structure
-   data = [ { 'date': d, 'projusers': {}, 'users': {}, 'projects': {} } for d in dates]
+   data = [ { 'date': d, 'projusers': {}, 'users': {}, 'projects': {}, 'parents': {} } for d in dates]
 
    # Collect raw data, split by project and user
    for accounting in args.accountingfile:
@@ -320,6 +320,40 @@ def main():
 
             for (i, b) in enumerate(sizebins):
                d['projects'][project]['job_size'][i] += user['job_size'][i]
+
+
+      # Aggregate info for each parent
+      for project, dat in d['projects'].items():
+         parent = project_to_parent(project)
+
+         if parent not in d['parents']:
+            d['parents'][parent] = {
+               'users': 0,
+               'jobs': 0,
+               'core_hours': 0,
+               'core_hours_adj': 0,
+               'cpu_hours': 0,
+               'mem_hours': 0,
+               'mem_req_hours': 0,
+               'wait_hours': 0,
+               'wall_hours': 0,
+               'wall_req_hours': 0,
+               'job_size': [0 for b in sizebins],
+            }
+
+         d['parents'][parent]['users'] += d['projects'][project]['users'] ##DEBUG not strictly true (double-counts users in multiple projects covered by same parent)
+         d['parents'][parent]['jobs'] += d['projects'][project]['jobs']
+         d['parents'][parent]['core_hours'] += d['projects'][project]['core_hours']
+         d['parents'][parent]['core_hours_adj'] += d['projects'][project]['core_hours_adj']
+         d['parents'][parent]['cpu_hours'] += d['projects'][project]['cpu_hours']
+         d['parents'][parent]['mem_hours'] += d['projects'][project]['mem_hours']
+         d['parents'][parent]['mem_req_hours'] += d['projects'][project]['mem_req_hours']
+         d['parents'][parent]['wait_hours'] += d['projects'][project]['wait_hours']
+         d['parents'][parent]['wall_hours'] += d['projects'][project]['wall_hours']
+         d['parents'][parent]['wall_req_hours'] += d['projects'][project]['wall_req_hours']
+
+         for (i, b) in enumerate(sizebins):
+            d['parents'][parent]['job_size'][i] += d['projects'][project]['job_size'][i]
 
 
    # Spit out answer
@@ -496,6 +530,87 @@ def summarise_totalsbydate(data, total_cores, bins):
    return headers, table, totals
 
 
+def summarise_parentsbydate(data, parent, total_cores, bins):
+   headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   if bins:
+      headers.extend([b['name'] for b in bins])
+
+   avail_core_hours = sum([d['date']['core_hours'] for d in data])
+   total_core_hours_adj = 0
+   total_cpu_hours = 0
+   total_mem_hours = 0
+   total_mem_req_hours = 0
+   total_wait_hours = 0
+   total_wall_hours = 0
+   total_wall_req_hours = 0
+
+   table = []
+   for d in data:
+      if parent in d['parents']:
+         core_hours_adj = sum([d['parents'][p]['core_hours_adj'] for p in d['parents']])
+         total_core_hours_adj += core_hours_adj
+
+         total_cpu_hours += d['parents'][parent]['cpu_hours']
+
+         total_mem_hours += d['parents'][parent]['mem_hours']
+         total_mem_req_hours += d['parents'][parent]['mem_req_hours']
+
+         total_wait_hours += d['parents'][parent]['wait_hours']
+
+         total_wall_hours += d['parents'][parent]['wall_hours']
+         total_wall_req_hours += d['parents'][parent]['wall_req_hours']
+ 
+         table.append({
+            'Date': d['date']['name'],
+            'Users': d['parents'][parent]['users'],
+            'Jobs': d['parents'][parent]['jobs'],
+            'Core Hrs': d['parents'][parent]['core_hours'],
+            '%Utl': percent(d['parents'][parent]['core_hours'], d['date']['core_hours']),
+            'Adj Core Hrs': d['parents'][parent]['core_hours_adj'],
+            'Adj %Utl': percent(d['parents'][parent]['core_hours_adj'], d['date']['core_hours']),
+            'Core Hrs/Wait': div(d['parents'][parent]['core_hours_adj'], d['parents'][parent]['wait_hours']),
+            '%Usg': percent(d['parents'][parent]['core_hours_adj'], core_hours_adj),
+            'Wall %Acc': percent(d['parents'][parent]['wall_req_hours'], d['parents'][parent]['wall_hours']),
+            'Core %Eff': percent(d['parents'][parent]['cpu_hours'], d['parents'][parent]['core_hours_adj']),
+            'Mem %Eff': percent(d['parents'][parent]['mem_hours'], d['parents'][parent]['mem_req_hours']),
+            **{ b['name']: d['parents'][parent]['job_size'][i] for i, b in enumerate(bins) },
+         })
+      else:
+         table.append({
+            'Date': d['date']['name'],
+            'Users': 0,
+            'Jobs': 0,
+            'Core Hrs': 0,
+            '%Utl': percent(0, 0),
+            'Adj Core Hrs': 0,
+            'Adj %Utl': percent(0, 0),
+            'Core Hrs/Wait': 0,
+            '%Usg': percent(0, 0),
+            'Wall %Acc': percent(0, 0),
+            'Core %Eff': percent(0, 0),
+            'Mem %Eff': percent(0, 0),
+            **{ b['name']: 0 for i, b in enumerate(bins) },
+         })
+
+   totals = {
+      'Date': 'TOTALS',
+      'Users': len(set([u for d in data for prj in d['projusers'] if project_to_parent(prj) == parent for u in d['projusers'][prj]])),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), avail_core_hours),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), avail_core_hours),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), total_wait_hours),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), total_core_hours_adj),
+      'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
+      'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
+      'Mem %Eff': percent(total_mem_hours, total_mem_req_hours),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
+   }
+
+   return headers, table, totals
+
+
 def summarise_projectsbydate(data, project, total_cores, bins):
    headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if bins:
@@ -649,6 +764,50 @@ def summarise_usersbydate(data, user, total_cores, bins):
       'Wall %Acc': percent(total_wall_req_hours, total_wall_hours),
       'Core %Eff': percent(total_cpu_hours, sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(total_mem_hours, total_mem_req_hours),
+      **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
+   }
+
+   return headers, table, totals
+
+
+def summarise_parents(data, total_cores, bins):
+   headers = [ 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   if bins:
+      headers.extend([b['name'] for b in bins])
+
+   core_hours_adj = sum([data['parents'][p]['core_hours_adj'] for p in data['parents']])
+
+   table = []
+   for parent, d in sorted(data['parents'].items(), key=lambda item: item[1]['core_hours_adj'], reverse=True):
+      table.append({
+         'Parent': parent,
+         'Users': d['users'],
+         'Jobs': d['jobs'],
+         'Core Hrs': d['core_hours'],
+         '%Utl': percent(d['core_hours'], data['date']['core_hours']),
+         'Adj Core Hrs': d['core_hours_adj'],
+         'Adj %Utl': percent(d['core_hours_adj'], data['date']['core_hours']),
+         'Core Hrs/Wait': div(d['core_hours_adj'], d['wait_hours']),
+         '%Usg': percent(d['core_hours_adj'], core_hours_adj),
+         'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
+         'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
+         'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
+         **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
+      }),
+
+   totals = {
+      'Parent': 'TOTALS',
+      'Users': len(data['users']),
+      'Jobs': sum_key(table, 'Jobs'),
+      'Core Hrs': sum_key(table, 'Core Hrs'),
+      '%Utl': percent(sum_key(table, 'Core Hrs'), data['date']['core_hours']),
+      'Adj Core Hrs': sum_key(table, 'Adj Core Hrs'),
+      'Adj %Utl': percent(sum_key(table, 'Adj Core Hrs'), data['date']['core_hours']),
+      'Core Hrs/Wait': div(sum_key(table, 'Adj Core Hrs'), sum([data['parents'][p]['wait_hours'] for p in data['parents']])),
+      '%Usg': percent(sum_key(table, 'Adj Core Hrs'), core_hours_adj),
+      'Wall %Acc': percent(sum([data['parents'][p]['wall_req_hours'] for p in data['parents']]), sum([data['parents'][p]['wall_hours'] for p in data['parents']])),
+      'Core %Eff': percent(sum([data['parents'][p]['cpu_hours'] for p in data['parents']]), sum_key(table, 'Adj Core Hrs')),
+      'Mem %Eff': percent(sum([data['parents'][p]['mem_hours'] for p in data['parents']]), sum([data['parents'][p]['mem_req_hours'] for p in data['parents']])),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -839,6 +998,14 @@ def print_summary(data, total_cores, reports, bins):
       print("=======\n")
       print_table(*summarise_totalsbydate(data, total_cores, bins))
 
+   if 'all' in reports or 'parentsbydate' in reports:
+      print("================")
+      print("Parents by date:")
+      print("================\n")
+      for parent in sorted(set([p for d in data for p in d['parents']])):
+         print("Parent:", parent)
+         print_table(*summarise_parentsbydate(data, parent, total_cores, bins))
+
    if 'all' in reports or 'projectsbydate' in reports:
       print("=================")
       print("Projects by date:")
@@ -846,6 +1013,14 @@ def print_summary(data, total_cores, reports, bins):
       for project in sorted(set([p for d in data for p in d['projusers']])):
          print("Project:", project)
          print_table(*summarise_projectsbydate(data, project, total_cores, bins))
+
+   if 'all' in reports or 'parents' in reports:
+      print("============")
+      print("Top parents:")
+      print("============\n")
+      for d in data:
+         print("Period:", d['date']['name'],"\n")
+         print_table(*summarise_parents(d, total_cores, bins))
 
    if 'all' in reports or 'projects' in reports:
       print("=============")
