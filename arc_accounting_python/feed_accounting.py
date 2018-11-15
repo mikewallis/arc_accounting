@@ -148,6 +148,10 @@ def main():
                # - Process any waiting lines
                for record in sge.records(accounting=fh):
                   if acc_record_num >= acc_max_record:
+                     job = str(record['job_number']) + "." + str(record['task_number'] or 1)
+
+                     if args.debug: print(job, "record accounting")
+
                      record['service'] = args.service
                      record['record'] = acc_record_num
                      cursor.execute(sge_add_record, record)
@@ -159,7 +163,7 @@ def main():
                         "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         {
                            'service': args.service,
-                           'job': str(record['job_number']) + "." + str(record['task_number'] or 1),
+                           'job': job,
                            'classified': False,
                         },
                         update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
