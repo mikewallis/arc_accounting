@@ -94,8 +94,6 @@ def main():
       ", ".join(['%(' + f + ')s' for f in fields]) + \
       ")"
 
-   syslog_select_record = "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s"
-   syslog_add_record = "INSERT INTO syslog_data (service, job) VALUES (%(service)s, %(job)s)"
    syslog_update_mpirun = "UPDATE syslog_data SET mpirun_file=%(mpirun_file)s WHERE service = %(service)s AND job = %(job)s"
    syslog_update_sgealloc = "UPDATE syslog_data SET alloc=%(alloc)s WHERE service = %(service)s AND job = %(job)s"
    syslog_update_sgenodes = "UPDATE syslog_data SET nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s WHERE service = %(service)s AND job = %(job)s"
@@ -131,17 +129,12 @@ def main():
          if args.syslogfile:
             # Determine number of old syslog records
 
-            insert_datastate = "INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)"
-            select_datastate = "SELECT * FROM data_source_state WHERE service = %s AND host = %s AND name = %s"
-            datastate = ( args.service, socket.getfqdn(), args.syslogfile )
-
-            cursor.execute(select_datastate, datastate)
-            sql = cursor.fetchall()
-
-            if len(sql) < 1:
-               cursor.execute(insert_datastate, datastate)
-               cursor.execute(select_datastate, datastate)
-               sql = cursor.fetchall()
+            sql = sql_get_create(
+               cursor,
+               "SELECT * FROM data_source_state WHERE service = %s AND host = %s AND name = %s",
+               "INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
+               (args.service, socket.getfqdn(), args.syslogfile ),
+            )
 
             sys_max_record = sql[0]['state']
             syslog.syslog("Found " + str(sys_max_record) + " old syslog " + \
@@ -200,14 +193,12 @@ def main():
                   record['service'] = args.service
 
                   # Retrieve existing record
-                  cursor.execute(syslog_select_record, record)
-                  sql = cursor.fetchall()
-
-                  # Create/retrieve if does not exist
-                  if len(sql) < 1:
-                     cursor.execute(syslog_add_record, record)
-                     cursor.execute(syslog_select_record, record)
-                     sql = cursor.fetchall()
+                  sql = sql_get_create(
+                     cursor,
+                     "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s",
+                     "INSERT INTO syslog_data (service, job) VALUES (%(service)s, %(job)s)",
+                     record,
+                  )
 
                   # Update fields according to syslog data
                   if record['type'] == "mpirun":
@@ -383,6 +374,18 @@ def syslog_records(file):
                if d_match.get('job', False):
                   yield({ **d, **d_match })
                   break
+
+
+def sql_get_create(cursor, select, insert, data):
+   cursor.execute(select, data)
+   sql = cursor.fetchall()
+
+   if len(sql) < 1:
+      cursor.execute(insert, data)
+      cursor.execute(select, data)
+      sql = cursor.fetchall()
+
+   return sql
 
 
 # Run program (if we've not been imported)
