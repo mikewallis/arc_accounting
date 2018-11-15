@@ -304,8 +304,8 @@ syslog_def = re.compile(r"""
 mpirun_def = re.compile(r"""
    (?P<type>mpirun)\s+
    cluster=(?P<cluster>\S*)\s+
-   job=(?P<job>\S*)\s+
-   file=(?P<mpirun_file>\S*)
+   job=(?P<job>\S+)\s+
+   file=(?P<mpirun_file>\S+)
 """, re.VERBOSE)
 
 # sgealloc data:
@@ -313,8 +313,8 @@ mpirun_def = re.compile(r"""
 sgealloc_def = re.compile(r"""
    (?P<type>sgealloc)\s+
    cluster=(?P<cluster>\S*)\s+
-   job=(?P<job>\S*)\s+
-   (?P<alloc>\S*)
+   job=(?P<job>\S+)\s+
+   (?P<alloc>\S+)
 """, re.VERBOSE)
 
 # sgenodes data:
@@ -322,7 +322,7 @@ sgealloc_def = re.compile(r"""
 sgenodes_def = re.compile(r"""
    (?P<type>sgenodes)\s+
    cluster=(?P<cluster>\S*)\s+
-   job=(?P<job>\S*)\s+
+   job=(?P<job>\S+)\s+
    nodes=(?P<nodes_nodes>\d*)\s+
    np=(?P<nodes_np>\d*)\s+
    ppn=(?P<nodes_ppn>\d*)\s+
@@ -334,7 +334,7 @@ sgenodes_def = re.compile(r"""
 sgemodules_def = re.compile(r"""
    (?P<type>sgemodules)\s+
    cluster=(?P<cluster>\S*)\s+
-   job=(?P<job>\S*)\s+
+   job=(?P<job>\S+)\s+
    (?P<modules>.*)
 """, re.VERBOSE)
 
@@ -345,7 +345,7 @@ sgemodules_def = re.compile(r"""
 #   cluster=(?P<cluster>\S*)\s+
 
 sgemoduleload_def = re.compile(r"""
-   job=(?P<job>\S*)\s+
+   job=(?P<job>\S+)\s+
    (?P<type>module\s+load)\s+
    (?P<newmodules>.*)\s+
    \((?P<modules>[^)]*)\)
