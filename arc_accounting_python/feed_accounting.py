@@ -14,6 +14,7 @@ import syslog
 import time
 import yaml
 import re
+import socket
 
 
 # Initialise data
@@ -119,16 +120,36 @@ def main():
                "SELECT count(*) FROM accounting_sge WHERE service = %s",
                (args.service, ),
             )
-            max_record = cursor.fetchall()[0][0]
-            syslog.syslog("Found " + str(max_record) + " old " + \
+            acc_max_record = cursor.fetchall()[0]['record']
+            syslog.syslog("Found " + str(acc_max_record) + " old sge " + \
                           args.service + " records")
 
             # Open input files and initialise state
             fh = open(args.accountingfile)
-            record_num = 0
+            acc_record_num = 0
 
          if args.syslogfile:
+            # Determine number of old syslog records
+
+            insert_datastate = "INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)"
+            select_datastate = "SELECT * FROM data_source_state WHERE service = %s AND host = %s AND name = %s"
+            datastate = ( args.service, socket.getfqdn(), args.syslogfile )
+
+            cursor.execute(select_datastate, datastate)
+            sql = cursor.fetchall()
+
+            if len(sql) < 1:
+               cursor.execute(insert_datastate, datastate)
+               cursor.execute(select_datastate, datastate)
+               sql = cursor.fetchall()
+
+            sys_max_record = sql[0]['state']
+            syslog.syslog("Found " + str(sys_max_record) + " old syslog " + \
+                          args.service + " records")
+
             s_fh = open(args.syslogfile)
+            sys_record_num = 0
+
 
          # Process records as they come in
          while True:
@@ -139,16 +160,16 @@ def main():
 
                # - Process any waiting lines
                for record in sge.records(accounting=fh):
-                  if record_num >= max_record:
-                     if 'start' not in insert: insert['start'] = record_num
-                     insert['end'] = record_num
+                  if acc_record_num >= acc_max_record:
+                     if 'start' not in insert: insert['start'] = acc_record_num
+                     insert['end'] = acc_record_num
 
                      record['service'] = args.service
-                     record['record'] = record_num
+                     record['record'] = acc_record_num
                      record['grp'] = record['group']
                      cursor.execute(sge_add_record, record)
 
-                  record_num += 1
+                  acc_record_num += 1
 
                # - Commit bunch
                if 'start' in insert:
@@ -160,10 +181,20 @@ def main():
 
             # Syslog records
             if args.syslogfile:
-               insert = {}
-
                # - Process any waiting lines
                for record in syslog_records(file=s_fh):
+                  sys_record_num += 1
+
+                  # Skip processed lines
+                  if sys_record_num < sys_max_record:
+                     if args.debug: print("skipping line", args.syslogfile, sys_record_num)
+                     continue
+
+                  # Record as processed
+                  cursor.execute(
+                     "UPDATE data_source_state SET state=%s WHERE service = %s AND host = %s AND name = %s",
+                     ( sys_record_num, args.service, socket.getfqdn(), args.syslogfile ),
+                  )
 
                   # Allocate to service
                   record['service'] = args.service
@@ -248,16 +279,7 @@ def main():
                   else:
                      print("What the?", record['type'])
 
-#                  print("here")
-
                   db.commit()
-
-#               # - Commit bunch
-#               if 'start' in insert:
-#                  syslog.syslog("Inserting new " + args.service + \
-#                         " syslog records " + str(insert['start']) + \
-#                         " to " + str(insert['end']))
-#                  db.commit()
 
             print("sleeping...")
             time.sleep(args.sleep)

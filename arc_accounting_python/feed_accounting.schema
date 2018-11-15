@@ -57,10 +57,11 @@ CREATE INDEX job_number ON accounting_sge (service, job_number);
 
 # Table to maintain bookmarks of where we are in our data sources
 create table data_source_state( 
+   service VARCHAR(32), 
    host VARCHAR(32),
    name VARCHAR(1024),
    active BOOL,
-   state INT UNSIGNED
+   state INT UNSIGNED NOT NULL DEFAULT 0
 );
 
 # Table to contain syslog data
