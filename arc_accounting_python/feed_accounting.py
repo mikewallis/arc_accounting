@@ -155,14 +155,14 @@ def main():
                      # Record job as requiring classification
                      sql_get_create(
                         cursor,
-                        "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s",
-                        "INSERT INTO syslog_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                        "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
+                        "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         {
                            'service': args.service,
                            'job': str(record['job_number']) + "." + str(record['task_number'] or 1),
                            'classified': False,
                         },
-                        update="UPDATE syslog_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
+                        update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
                      )
 
                      db.commit()
@@ -197,8 +197,8 @@ def main():
                   # Retrieve/create existing record
                   sql = sql_get_create(
                      cursor,
-                     "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s",
-                     "INSERT INTO syslog_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                     "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
+                     "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                      record,
                   )
 
@@ -391,7 +391,7 @@ def sql_get_create(cursor, select, insert, data, update=None):
 
 def sql_update_job(cursor, update, data):
    cursor.execute(
-      "UPDATE syslog_data SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
+      "UPDATE job_data SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
       data,
    )
 

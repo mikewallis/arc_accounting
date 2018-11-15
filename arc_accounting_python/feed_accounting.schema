@@ -65,7 +65,7 @@ create table data_source_state(
 );
 
 # Table to contain syslog data
-create table syslog_data(
+create table job_data(
    service VARCHAR(32), 
    job VARCHAR(32),
    mpirun_file VARCHAR(10240),
@@ -86,4 +86,4 @@ create table syslog_data(
    class_app VARCHAR(32)
 );
 
-CREATE UNIQUE INDEX record on syslog_data (service, job);
+CREATE UNIQUE INDEX record on job_data (service, job);
