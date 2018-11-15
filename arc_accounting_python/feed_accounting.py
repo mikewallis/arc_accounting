@@ -94,17 +94,13 @@ def main():
       ", ".join(['%(' + f + ')s' for f in fields]) + \
       ")"
 
-   syslog_update_mpirun = "UPDATE syslog_data SET mpirun_file=%(mpirun_file)s WHERE service = %(service)s AND job = %(job)s"
-   syslog_update_sgealloc = "UPDATE syslog_data SET alloc=%(alloc)s WHERE service = %(service)s AND job = %(job)s"
-   syslog_update_sgenodes = "UPDATE syslog_data SET nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s WHERE service = %(service)s AND job = %(job)s"
-   syslog_update_modules = "UPDATE syslog_data SET modules=%(modules)s WHERE service = %(service)s AND job = %(job)s"
-   syslog_update_coproc = "UPDATE syslog_data SET coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE service = %(service)s AND job = %(job)s"
 
    syslog.openlog()
 
    # Try connecting to database and processing records.
    # Retry after a delay if there's a failure.
    while True:
+      if args.debug: print("Entering main loop")
       try:
          # Connect to database
          db = mariadb.connect(**credentials)
@@ -136,7 +132,7 @@ def main():
                (args.service, socket.getfqdn(), args.syslogfile ),
             )
 
-            sys_max_record = sql[0]['state']
+            sys_max_record = sql['state']
             syslog.syslog("Found " + str(sys_max_record) + " old syslog " + \
                           args.service + " records")
 
@@ -162,6 +158,9 @@ def main():
                      record['grp'] = record['group']
                      cursor.execute(sge_add_record, record)
 
+                     # Record job as requiring classification
+                     ##DEBUG
+
                   acc_record_num += 1
 
                # - Commit bunch
@@ -171,9 +170,11 @@ def main():
                          " to " + str(insert['end']))
                   db.commit()
 
-
             # Syslog records
+            # DEBUG: migrate to 3rd normal form, allowing more flexible
+            # retrieval of job data
             if args.syslogfile:
+
                # - Process any waiting lines
                for record in syslog_records(file=s_fh):
                   sys_record_num += 1
@@ -183,96 +184,93 @@ def main():
                      if args.debug: print("skipping line", args.syslogfile, sys_record_num)
                      continue
 
-                  # Record as processed
+                  # Record line as processed
                   cursor.execute(
                      "UPDATE data_source_state SET state=%s WHERE service = %s AND host = %s AND name = %s",
-                     ( sys_record_num, args.service, socket.getfqdn(), args.syslogfile ),
+                     (sys_record_num, args.service, socket.getfqdn(), args.syslogfile ),
                   )
 
-                  # Allocate to service
+                  # Allocate to service, flag as needing classification if
+                  # we update the record
                   record['service'] = args.service
+                  record['classified'] = False
 
-                  # Retrieve existing record
+                  # Retrieve/create existing record
                   sql = sql_get_create(
                      cursor,
                      "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s",
-                     "INSERT INTO syslog_data (service, job) VALUES (%(service)s, %(job)s)",
+                     "INSERT INTO syslog_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                      record,
                   )
 
                   # Update fields according to syslog data
                   if record['type'] == "mpirun":
-                     # DEBUG: migrate to 3rd normal form, allowing retrieval
-                     # of jobs with a given mpirun file.
 
                      # Add new mpirun file, comma separated (squash duplicates)
-                     if sql[0].get('mpirun_file', None):
-                        record['mpirun_file'] = ",".join(sorted(set([*sql[0]['mpirun_file'].split(','), record['mpirun_file']])))
+                     if sql.get('mpirun_file', None):
+                        record['mpirun_file'] = ",".join(sorted(set([*sql['mpirun_file'].split(','), record['mpirun_file']])))
 
                      # Update record (if we've changed it)
-                     if sql[0]['mpirun_file'] != record['mpirun_file']:
+                     if sql['mpirun_file'] != record['mpirun_file']:
                         if args.debug: print(record['job'], "update mpirun file")
-                        cursor.execute(syslog_update_mpirun, record)
+                        sql_update_job(cursor, "mpirun_file=%(mpirun_file)s", record)
 
                   elif record['type'] == "sgealloc":
                      if record['alloc']:
-                        if sql[0]['alloc'] != record['alloc']:
+                        if sql['alloc'] != record['alloc']:
                            if args.debug: print(record['job'], "update sgealloc")
-                           cursor.execute(syslog_update_sgealloc, record)
+                           sql_update_job(cursor, "alloc=%(alloc)s", record)
 
                   elif record['type'] == "sgenodes":
                      if record['nodes_nodes']:
-                        if sql[0]['nodes_nodes'] != int(record['nodes_nodes']) or \
-                           sql[0]['nodes_np'] != int(record['nodes_np']) or \
-                           sql[0]['nodes_ppn'] != int(record['nodes_ppn']) or \
-                           sql[0]['nodes_tpp'] != int(record['nodes_tpp']):
+                        if sql['nodes_nodes'] != int(record['nodes_nodes']) or \
+                           sql['nodes_np'] != int(record['nodes_np']) or \
+                           sql['nodes_ppn'] != int(record['nodes_ppn']) or \
+                           sql['nodes_tpp'] != int(record['nodes_tpp']):
 
                            if args.debug: print(record['job'], "update sgenodes")
-                           cursor.execute(syslog_update_sgenodes, record)
+                           sql_update_job(cursor, "nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s", record)
 
                   elif record['type'] == "sgemodules" or \
                        record['type'] == "module load":
 
-                     # DEBUG: migrate to 3rd normal form, allowing retrieval
-                     # of jobs with a given module loaded.
-
                      if record['modules']:
                         m = record['modules'].split(':')
 
-                        if sql[0]['modules']:
-                           m.extend(sql[0]['modules'].split(','))
+                        if sql['modules']:
+                           m.extend(sql['modules'].split(','))
 
                         record['modules'] = ','.join(sorted(set(m)))
 
-                        if sql[0]['modules'] != record['modules']:
+                        if sql['modules'] != record['modules']:
                            if args.debug: print(record['job'], "update modules")
-                           cursor.execute(syslog_update_modules, record)
+                           sql_update_job(cursor, "modules=%(modules)s", record)
 
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
 
                      record['coproc_names'] = record['host'] + ":" + record['name']
 
-                     if sql[0].get('coproc_names', None):
-                        record['coproc_names'] = ",".join(sorted(set([*sql[0]['coproc_names'].split(','), record['coproc_names']])))
+                     if sql.get('coproc_names', None):
+                        record['coproc_names'] = ",".join(sorted(set([*sql['coproc_names'].split(','), record['coproc_names']])))
 
                      # Skip if this is a record we've seen before
-                     if record['coproc_names'] == sql[0].get('coproc_names', None): continue
+                     if record['coproc_names'] == sql.get('coproc_names', None): continue
 
                      # Convert gpu stats to coproc stats and add to record
-                     record['coproc_max_mem'] = sum([1024*1024*int(record['coproc_max_mem']), sql[0]['coproc_max_mem']]) # bytes
-                     record['coproc_cpu'] = sum([float(record['coproc_cpu'])/100, sql[0]['coproc_cpu']]) # s
-                     record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql[0]['coproc_mem']]) # Gib * s
-                     record['coproc_maxvmem'] = sum([1024*1024*int(record['coproc_maxvmem']), sql[0]['coproc_maxvmem']]) # bytes
+                     record['coproc_max_mem'] = sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]) # bytes
+                     record['coproc_cpu'] = sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]) # s
+                     record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]) # Gib * s
+                     record['coproc_maxvmem'] = sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]) # bytes
 
                      if args.debug: print(record['job'], "update gpu stats")
-                     cursor.execute(syslog_update_coproc, record)
+                     sql_update_job(cursor, "coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s", record)
 
                   else:
-                     print("What the?", record['type'])
+                     if args.debug: print("What the?", record['type'])
 
                   db.commit()
 
-            print("sleeping...")
+            if args.debug: print("sleeping...")
             time.sleep(args.sleep)
       except:
          syslog.syslog("Processing failed" + str(sys.exc_info()))
@@ -385,8 +383,13 @@ def sql_get_create(cursor, select, insert, data):
       cursor.execute(select, data)
       sql = cursor.fetchall()
 
-   return sql
+   return sql[0]
 
+def sql_update_job(cursor, update, data):
+   cursor.execute(
+      "UPDATE syslog_data SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
+      data,
+   )
 
 # Run program (if we've not been imported)
 # ---------------------------------------
