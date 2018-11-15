@@ -94,7 +94,6 @@ def main():
       ", ".join(['%(' + f + ')s' for f in fields]) + \
       ")"
 
-
    syslog.openlog()
 
    # Try connecting to database and processing records.
@@ -114,7 +113,7 @@ def main():
                "SELECT count(*) FROM accounting_sge WHERE service = %s",
                (args.service, ),
             )
-            acc_max_record = cursor.fetchall()[0]['record']
+            acc_max_record = cursor.fetchall()[0]['count(*)']
             syslog.syslog("Found " + str(acc_max_record) + " old sge " + \
                           args.service + " records")
 
@@ -145,30 +144,30 @@ def main():
 
             # SGE accounting records
             if args.accountingfile:
-               insert = {}
 
                # - Process any waiting lines
                for record in sge.records(accounting=fh):
                   if acc_record_num >= acc_max_record:
-                     if 'start' not in insert: insert['start'] = acc_record_num
-                     insert['end'] = acc_record_num
-
                      record['service'] = args.service
                      record['record'] = acc_record_num
-                     record['grp'] = record['group']
                      cursor.execute(sge_add_record, record)
 
                      # Record job as requiring classification
-                     ##DEBUG
+                     sql_get_create(
+                        cursor,
+                        "SELECT * FROM syslog_data WHERE service = %(service)s AND job = %(job)s",
+                        "INSERT INTO syslog_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                        {
+                           'service': args.service,
+                           'job': str(record['job_number']) + "." + str(record['task_number'] or 1),
+                           'classified': False,
+                        },
+                        update="UPDATE syslog_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
+                     )
+
+                     db.commit()
 
                   acc_record_num += 1
-
-               # - Commit bunch
-               if 'start' in insert:
-                  syslog.syslog("Inserting new " + args.service + \
-                         " sge accounting records " + str(insert['start']) + \
-                         " to " + str(insert['end']))
-                  db.commit()
 
             # Syslog records
             # DEBUG: migrate to 3rd normal form, allowing more flexible
@@ -374,12 +373,17 @@ def syslog_records(file):
                   break
 
 
-def sql_get_create(cursor, select, insert, data):
+# Return record (after creating or updating)
+def sql_get_create(cursor, select, insert, data, update=None):
    cursor.execute(select, data)
    sql = cursor.fetchall()
 
    if len(sql) < 1:
       cursor.execute(insert, data)
+      cursor.execute(select, data)
+      sql = cursor.fetchall()
+   elif update:
+      cursor.execute(update, data)
       cursor.execute(select, data)
       sql = cursor.fetchall()
 
