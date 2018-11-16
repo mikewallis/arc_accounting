@@ -5,6 +5,8 @@
 create table accounting_sge( 
    service VARCHAR(32), 
    record BIGINT UNSIGNED, 
+   job VARCHAR(32),
+
    qname VARCHAR(1024), 
    hostname VARCHAR(1024), 
    grp VARCHAR(1024), 
@@ -53,6 +55,7 @@ create table accounting_sge(
 ); 
  
 CREATE UNIQUE INDEX record ON accounting_sge (service, record); 
+CREATE INDEX job ON accounting_sge (service, job); 
 CREATE INDEX job_number ON accounting_sge (service, job_number); 
 
 # Table to maintain bookmarks of where we are in our data sources

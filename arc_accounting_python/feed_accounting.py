@@ -20,7 +20,10 @@ import socket
 # Initialise data
 
 fields = [
+   'service',
    'record',
+   'job',
+
    'qname',
    'hostname',
    'grp',
@@ -88,9 +91,9 @@ def main():
    else:
       raise SystemExit("Error: provide a database credential file")
 
-   sge_add_record = "INSERT INTO accounting_sge (service, " + \
+   sge_add_record = "INSERT INTO accounting_sge (" + \
       ", ".join([f for f in fields]) + \
-      ") VALUES (%(service)s, " + \
+      ") VALUES (" + \
       ", ".join(['%(' + f + ')s' for f in fields]) + \
       ")"
 
@@ -148,12 +151,13 @@ def main():
                # - Process any waiting lines
                for record in sge.records(accounting=fh):
                   if acc_record_num >= acc_max_record:
-                     job = str(record['job_number']) + "." + str(record['task_number'] or 1)
-
-                     if args.debug: print(job, "record accounting")
 
                      record['service'] = args.service
                      record['record'] = acc_record_num
+                     record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
+
+                     if args.debug: print(record['job'], "record accounting")
+
                      cursor.execute(sge_add_record, record)
 
                      # Record job as requiring classification
@@ -163,7 +167,7 @@ def main():
                         "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         {
                            'service': args.service,
-                           'job': job,
+                           'job': record['job'],
                            'classified': False,
                         },
                         update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
