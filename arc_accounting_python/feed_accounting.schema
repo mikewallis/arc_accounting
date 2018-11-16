@@ -4,7 +4,7 @@
  
 create table accounting_sge( 
    service VARCHAR(32), 
-   record INT UNSIGNED, 
+   record BIGINT UNSIGNED, 
    qname VARCHAR(1024), 
    hostname VARCHAR(1024), 
    grp VARCHAR(1024), 
@@ -61,20 +61,19 @@ create table data_source_state(
    host VARCHAR(32),
    name VARCHAR(1024),
    active BOOL,
-   state INT UNSIGNED NOT NULL DEFAULT 0
+   state BIGINT UNSIGNED NOT NULL DEFAULT 0
 );
 
-# Table to contain syslog data
+# Table to contain job data (from syslog, etc.)
 create table job_data(
+   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    service VARCHAR(32), 
    job VARCHAR(32),
-   mpirun_file VARCHAR(10240),
    alloc VARCHAR(10240),
    nodes_nodes INT UNSIGNED,
    nodes_np INT UNSIGNED,
    nodes_ppn INT UNSIGNED,
    nodes_tpp INT UNSIGNED,
-   modules VARCHAR(10240),
    coproc_names VARCHAR(10240),
    coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
    coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
@@ -87,3 +86,30 @@ create table job_data(
 );
 
 CREATE UNIQUE INDEX record on job_data (service, job);
+CREATE INDEX classified on job_data (service, classified);
+
+# Tables to contain job to mpirun mapping (many-to-many)
+create table job_to_mpirun(
+   jobid BIGINT NOT NULL,
+   mpirunid BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
+
+create table mpirun(
+   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+# Tables to contain job to module mapping (many-to-many)
+create table job_to_module(
+   jobid BIGINT NOT NULL,
+   moduleid BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
+
+create table module(
+   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);

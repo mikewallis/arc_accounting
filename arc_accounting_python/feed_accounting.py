@@ -174,8 +174,6 @@ def main():
                   acc_record_num += 1
 
             # Syslog records
-            # DEBUG: migrate to 3rd normal form, allowing more flexible
-            # retrieval of job data
             if args.syslogfile:
 
                # - Process any waiting lines
@@ -209,14 +207,25 @@ def main():
                   # Update fields according to syslog data
                   if record['type'] == "mpirun":
 
-                     # Add new mpirun file, comma separated (squash duplicates)
-                     if sql.get('mpirun_file', None):
-                        record['mpirun_file'] = ",".join(sorted(set([*sql['mpirun_file'].split(','), record['mpirun_file']])))
+                     # Get mpirun file record
+                     mpirun = sql_get_create(
+                        cursor,
+                        "SELECT id, name FROM mpirun WHERE name = %(name)s",
+                        "INSERT INTO mpirun (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                        { 'name': record['mpirun_file'] },
+                     )
 
-                     # Update record (if we've changed it)
-                     if sql['mpirun_file'] != record['mpirun_file']:
-                        if args.debug: print(record['job'], "update mpirun file")
-                        sql_update_job(cursor, "mpirun_file=%(mpirun_file)s", record)
+                     # Add mpirun file to job record if needed
+                     # Mark job as needing fresh classification
+                     sql_get_create(
+                        cursor,
+                        "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
+                        "INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
+                        { 'jobid': sql['id'], 'mpirunid': mpirun['id'] },
+                        oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                     )
+
+                     if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
 
                   elif record['type'] == "sgealloc":
                      if record['alloc']:
@@ -238,16 +247,26 @@ def main():
                        record['type'] == "module load":
 
                      if record['modules']:
-                        m = record['modules'].split(':')
+                        for module in record['modules'].split(':'):
+                           # Get module record
+                           mod = sql_get_create(
+                              cursor,
+                              "SELECT id, name FROM module WHERE name = %(name)s",
+                              "INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                              { 'name': module },
+                           )
 
-                        if sql['modules']:
-                           m.extend(sql['modules'].split(','))
+                           # Add module file to job record if needed
+                           # Mark job as needing fresh classification
+                           sql_get_create(
+                              cursor,
+                              "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
+                              "INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
+                              { 'jobid': sql['id'], 'moduleid': mod['id'] },
+                              oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                           )
 
-                        record['modules'] = ','.join(sorted(set(m)))
-
-                        if sql['modules'] != record['modules']:
-                           if args.debug: print(record['job'], "update modules")
-                           sql_update_job(cursor, "modules=%(modules)s", record)
+                        if args.debug: print(record['job'], "module", record['modules'])
 
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
 
@@ -366,7 +385,7 @@ def syslog_records(file):
 
          # Process different types of record:
 
-         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgemoduleload_def, sgegpustats_def ]:
+         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgegpustats_def ]:
             r_match = r_def.match(r['data'])
 
             if r_match:
@@ -378,16 +397,19 @@ def syslog_records(file):
 
 
 # Return record (after creating or updating)
-def sql_get_create(cursor, select, insert, data, update=None):
+def sql_get_create(cursor, select, insert, data, update=None, oninsert=None):
    cursor.execute(select, data)
    sql = cursor.fetchall()
 
    if len(sql) < 1:
       cursor.execute(insert, data)
+      if oninsert: cursor.execute(oninsert, data)
+
       cursor.execute(select, data)
       sql = cursor.fetchall()
    elif update:
       cursor.execute(update, data)
+
       cursor.execute(select, data)
       sql = cursor.fetchall()
 
