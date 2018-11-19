@@ -127,11 +127,12 @@ def main():
          if args.syslogfile:
             # Determine number of old syslog records
 
-            sql = sql_get_create(
+            sql = sge.sql_get_create(
                cursor,
                "SELECT * FROM data_source_state WHERE service = %s AND host = %s AND name = %s",
-               "INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
                (args.service, socket.getfqdn(), args.syslogfile ),
+               insert="INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
+               first=True,
             )
 
             sys_max_record = sql['state']
@@ -161,16 +162,17 @@ def main():
                      cursor.execute(sge_add_record, record)
 
                      # Record job as requiring classification
-                     sql_get_create(
+                     sge.sql_get_create(
                         cursor,
                         "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
-                        "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         {
                            'service': args.service,
                            'job': record['job'],
                            'classified': False,
                         },
+                        insert="INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
+                        first=True,
                      )
 
                      db.commit()
@@ -201,32 +203,35 @@ def main():
                   record['classified'] = False
 
                   # Retrieve/create existing record
-                  sql = sql_get_create(
+                  sql = sge.sql_get_create(
                      cursor,
                      "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
-                     "INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                      record,
+                     insert="INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                     first=True,
                   )
 
                   # Update fields according to syslog data
                   if record['type'] == "mpirun":
 
                      # Get mpirun file record
-                     mpirun = sql_get_create(
+                     mpirun = sge.sql_get_create(
                         cursor,
                         "SELECT id, name FROM mpirun WHERE name = %(name)s",
-                        "INSERT INTO mpirun (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                         { 'name': record['mpirun_file'] },
+                        insert="INSERT INTO mpirun (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                        first=True,
                      )
 
                      # Add mpirun file to job record if needed
                      # Mark job as needing fresh classification
-                     sql_get_create(
+                     sge.sql_get_create(
                         cursor,
                         "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
-                        "INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
                         { 'jobid': sql['id'], 'mpirunid': mpirun['id'] },
+                        insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
                         oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                        first=True,
                      )
 
                      if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
@@ -253,21 +258,23 @@ def main():
                      if record['modules']:
                         for module in record['modules'].split(':'):
                            # Get module record
-                           mod = sql_get_create(
+                           mod = sge.sql_get_create(
                               cursor,
                               "SELECT id, name FROM module WHERE name = %(name)s",
-                              "INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                               { 'name': module },
+                              insert="INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                              first=True,
                            )
 
                            # Add module file to job record if needed
                            # Mark job as needing fresh classification
-                           sql_get_create(
+                           sge.sql_get_create(
                               cursor,
                               "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
-                              "INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
                               { 'jobid': sql['id'], 'moduleid': mod['id'] },
+                              insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
                               oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                              first=True,
                            )
 
                         if args.debug: print(record['job'], "module", record['modules'])
@@ -399,25 +406,6 @@ def syslog_records(file):
                   yield({ **d, **d_match })
                   break
 
-
-# Return record (after creating or updating)
-def sql_get_create(cursor, select, insert, data, update=None, oninsert=None):
-   cursor.execute(select, data)
-   sql = cursor.fetchall()
-
-   if len(sql) < 1:
-      cursor.execute(insert, data)
-      if oninsert: cursor.execute(oninsert, data)
-
-      cursor.execute(select, data)
-      sql = cursor.fetchall()
-   elif update:
-      cursor.execute(update, data)
-
-      cursor.execute(select, data)
-      sql = cursor.fetchall()
-
-   return sql[0]
 
 def sql_update_job(cursor, update, data):
    cursor.execute(

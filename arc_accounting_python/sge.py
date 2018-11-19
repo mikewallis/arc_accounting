@@ -262,3 +262,33 @@ def node_type(nodetype, element):
       if element in d:
          return d[element]
 
+
+# Generic SQL helper (not really related to SGE... need better home)
+# Return record (after creating or updating)
+# - select: execute this to return records
+# - update: if found records, execute this
+# - insert: if no records, execute this
+# - oninsert: if inserted records, also execute this (e.g. other table)
+def sql_get_create(cursor, select, data, insert=None, update=None, oninsert=None, first=False):
+   cursor.execute(select, data)
+   sql = cursor.fetchall()
+
+   if len(sql) < 1:
+      if insert:
+         cursor.execute(insert, data)
+         if oninsert: cursor.execute(oninsert, data)
+
+         cursor.execute(select, data)
+         sql = cursor.fetchall()
+   elif update:
+      cursor.execute(update, data)
+
+      cursor.execute(select, data)
+      sql = cursor.fetchall()
+
+   # If only want one, don't return record embedded in a tuple
+   if first:
+      return sql[0]
+
+   return sql
+
