@@ -288,7 +288,8 @@ def sql_get_create(cursor, select, data, insert=None, update=None, oninsert=None
 
    # If only want one, don't return record embedded in a tuple
    if first:
-      return sql[0]
+      if len(sql) > 0: return sql[0]
+      return None
 
    return sql
 

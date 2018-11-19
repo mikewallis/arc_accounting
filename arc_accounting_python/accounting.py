@@ -46,6 +46,9 @@ parser.add_argument('--nocommas', action='store_true', default=False, help="Do n
 parser.add_argument('--printrecords', action='store_true', default=False, help="Print records to standard out")
 parser.add_argument('--byyear', action='store_true', default=False, help="Report date ranges, year by year")
 parser.add_argument('--bymonth', action='store_true', default=False, help="Report date ranges, month by month")
+parser.add_argument('--service', action='store', type=str, help="Service we are reporting on")
+parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
+parser.add_argument('--byapp', action='store_true', default=False, help="Report on applications, not users")
 
 args = parser.parse_args()
 
@@ -193,6 +196,17 @@ def main():
    # Initialise our main data structure
    data = [ { 'date': d, 'projusers': {}, 'users': {}, 'projects': {}, 'parents': {} } for d in dates]
 
+   # Open database connection, if supplied
+   if args.credfile:
+      with open(args.credfile, 'r') as stream:
+         import yaml
+         import mysql.connector as mariadb
+
+         credentials = yaml.safe_load(stream)
+         db = mariadb.connect(**credentials)
+         cursor = db.cursor(dictionary=True)
+
+
    # Collect raw data, split by project and user
    for accounting in args.accountingfile:
       for record in sge.records(accounting=accounting, modify=record_modify):
@@ -206,6 +220,19 @@ def main():
                   for f in sorted(record):
                      print(f +":", record[f])
                   print("\n")
+
+               # Retrieve non-accounting data
+               # (1st stab - 'applications' instead of 'users')
+               if args.byapp and args.credfile:
+                  record['service'] = args.service
+                  sql = sge.sql_get_create(
+                     cursor,
+                     "SELECT class_app FROM job_data WHERE service = %(service)s AND job = %(job)s",
+                     record,
+                     first=True
+                  )
+                  if sql: user = sql['class_app']
+                  if not user: user = 'unknown'
 
                # Init data
 
@@ -408,6 +435,9 @@ def record_modify(record):
 
    # Add project parent
    record['parent'] = project_to_parent(project)
+
+   # Name the record
+   record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
 
    # Add size and core hour figures
 
