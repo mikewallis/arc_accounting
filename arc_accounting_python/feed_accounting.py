@@ -9,7 +9,7 @@ from __future__ import print_function
 import argparse
 import sys
 import sge
-import mysql.connector as mariadb
+import MySQLdb as mariadb
 import syslog
 import time
 import yaml
@@ -106,7 +106,7 @@ def main():
       try:
          # Connect to database
          db = mariadb.connect(**credentials)
-         cursor = db.cursor(dictionary=True)
+         cursor = db.cursor(mariadb.cursors.DictCursor)
 
          # Initialise state
 

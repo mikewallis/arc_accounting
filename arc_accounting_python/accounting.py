@@ -200,11 +200,11 @@ def main():
    if args.credfile:
       with open(args.credfile, 'r') as stream:
          import yaml
-         import mysql.connector as mariadb
+         import MySQLdb as mariadb
 
          credentials = yaml.safe_load(stream)
          db = mariadb.connect(**credentials)
-         cursor = db.cursor(dictionary=True)
+         cursor = db.cursor(mariadb.cursors.DictCursor)
 
 
    # Collect raw data, split by project and user

@@ -8,7 +8,7 @@ from __future__ import print_function
 
 import argparse
 import sys
-import mysql.connector as mariadb
+import MySQLdb as mariadb
 import syslog
 import time
 import yaml
@@ -42,14 +42,10 @@ def main():
       try:
          # Connect to database
          db = mariadb.connect(**credentials)
-
-         # Buffer results, as doing otherwise blocks other
-         # cursors from doing anything
-         cursor = db.cursor(dictionary=True, buffered=True)
+         cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
-            # Do in batches, as buffered cursors means entire set is
-            # transferred at once.
+            # Do in batches, as cursor transfers entire set at once
             cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT 10000")
             for sql in cursor:
                classify(db, sql)
