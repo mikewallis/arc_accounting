@@ -46,7 +46,7 @@ parser.add_argument('--nocommas', action='store_true', default=False, help="Do n
 parser.add_argument('--printrecords', action='store_true', default=False, help="Print records to standard out")
 parser.add_argument('--byyear', action='store_true', default=False, help="Report date ranges, year by year")
 parser.add_argument('--bymonth', action='store_true', default=False, help="Report date ranges, month by month")
-parser.add_argument('--service', action='store', type=str, help="Service we are reporting on")
+parser.add_argument('--services', action='store', type=str, help="Services we are reporting on")
 parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
 parser.add_argument('--byapp', action='store_true', default=False, help="Report on applications, not users")
 
@@ -162,7 +162,7 @@ def main():
       args.projects = [ 'Arts', 'ENG', 'ENV', 'ESSL', 'FBS', 'LUBS', 'MAPS', 'MEDH', 'PVAC' ]
 
    # Read default accounting file if none specified
-   if not args.accountingfile:
+   if not args.accountingfile and not args.credfile:
       args.accountingfile = [ os.environ["SGE_ROOT"] + "/" + os.environ["SGE_CELL"] + "/common/accounting" ]
 
    # All reports, if not specified
@@ -189,6 +189,7 @@ def main():
    args.accountingfile = commasep_list(args.accountingfile)
    args.reports = commasep_list(args.reports)
    args.sizebins = commasep_list(args.sizebins)
+   args.services = commasep_list(args.services)
 
    # Parse job size bins
    sizebins = parse_startend(args.sizebins, type='int')
@@ -196,90 +197,35 @@ def main():
    # Initialise our main data structure
    data = [ { 'date': d, 'projusers': {}, 'users': {}, 'projects': {}, 'parents': {} } for d in dates]
 
-   # Open database connection, if supplied
+
+   # Collect raw data, split by project and user
+
+   # - raw accounting file data
+   if args.accountingfile:
+      for accounting in args.accountingfile:
+         print("reading from", accounting)
+         for record in sge.records(accounting=accounting, modify=record_modify):
+            for d in data:
+               if record_filter(record, d['date']):
+                  process_raw(record, d['projusers'], sizebins)
+
+
+   # - raw database accounting data
    if args.credfile:
+      # Open database connection
       with open(args.credfile, 'r') as stream:
          import yaml
          import MySQLdb as mariadb
 
          credentials = yaml.safe_load(stream)
          db = mariadb.connect(**credentials)
-         cursor = db.cursor(mariadb.cursors.DictCursor)
 
-
-   # Collect raw data, split by project and user
-   for accounting in args.accountingfile:
-      for record in sge.records(accounting=accounting, modify=record_modify):
-         for d in data:
-            if record_filter(record, d['date']):
-               user = record['owner']
-               project = record['project']
-
-               # Print record, if requested
-               if args.printrecords:
-                  for f in sorted(record):
-                     print(f +":", record[f])
-                  print("\n")
-
-               # Retrieve non-accounting data
-               # (1st stab - 'applications' instead of 'users')
-               if args.byapp and args.credfile:
-                  record['service'] = args.service
-                  sql = sge.sql_get_create(
-                     cursor,
-                     "SELECT class_app FROM job_data WHERE service = %(service)s AND job = %(job)s",
-                     record,
-                     first=True
-                  )
-                  if sql: user = sql['class_app']
-                  if not user: user = 'unknown'
-
-               # Init data
-
-               if project not in d['projusers']:
-                  d['projusers'][project] = {}
-
-               if user not in d['projusers'][project]:
-                  d['projusers'][project][user] = {
-                     'jobs': 0,
-                     'core_hours': 0,
-                     'core_hours_adj': 0,
-                     'cpu_hours': 0,
-                     'mem_hours': 0,
-                     'mem_req_hours': 0,
-                     'wait_hours': 0,
-                     'wall_hours': 0,
-                     'wall_req_hours': 0,
-                     'job_size': [0 for b in sizebins],
-                  }
-
-               # Record usage
-
-               # - count jobs
-               d['projusers'][project][user]['jobs'] += 1
-
-               # - count blocked core hours
-               d['projusers'][project][user]['core_hours'] += record['core_hours']
-               d['projusers'][project][user]['core_hours_adj'] += record['core_hours_adj']
-
-               # - count used core hours
-               d['projusers'][project][user]['cpu_hours'] += record['cpu'] / float(3600)
-
-               # - count used and blocked memory
-               d['projusers'][project][user]['mem_hours'] += record['core_hours'] * record['maxvmem']
-               d['projusers'][project][user]['mem_req_hours'] += record['core_hours'] * record['mem_req']
-
-               # - count wait time
-               d['projusers'][project][user]['wait_hours'] += max((record['end_time'] - record['submission_time']) / float(3600), 0)
-
-               # - count wallclock time
-               d['projusers'][project][user]['wall_hours'] += record['ru_wallclock'] / float(3600)
-               d['projusers'][project][user]['wall_req_hours'] += sge.category_resource(record['category'], 'h_rt') / float(3600)
-
-               # - job size distribution
-               for (i, b) in enumerate(sizebins):
-                  if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
-                     d['projusers'][project][user]['job_size'][i] += record['core_hours_adj']
+      for service in args.services:
+         print("reading database records for", service)
+         for record in sge.dbrecords(db, service, modify=record_modify):
+            for d in data:
+               if record_filter(record, d['date']):
+                  process_raw(record, d['projusers'], sizebins)
 
 
    # Create summary info for projects and users
@@ -388,6 +334,58 @@ def main():
 
    # Spit out answer
    print_summary(data, args.cores, args.reports, sizebins)
+
+
+def process_raw(record, projusers, sizebins):
+   user = record['owner']
+   project = record['project']
+
+   # Init data
+
+   if project not in projusers:
+      projusers[project] = {}
+
+   if user not in projusers[project]:
+      projusers[project][user] = {
+         'jobs': 0,
+         'core_hours': 0,
+         'core_hours_adj': 0,
+         'cpu_hours': 0,
+         'mem_hours': 0,
+         'mem_req_hours': 0,
+         'wait_hours': 0,
+         'wall_hours': 0,
+         'wall_req_hours': 0,
+         'job_size': [0 for b in sizebins],
+      }
+
+   # Record usage
+
+   # - count jobs
+   projusers[project][user]['jobs'] += 1
+
+   # - count blocked core hours
+   projusers[project][user]['core_hours'] += record['core_hours']
+   projusers[project][user]['core_hours_adj'] += record['core_hours_adj']
+
+   # - count used core hours
+   projusers[project][user]['cpu_hours'] += record['cpu'] / float(3600)
+
+   # - count used and blocked memory
+   projusers[project][user]['mem_hours'] += record['core_hours'] * record['maxvmem']
+   projusers[project][user]['mem_req_hours'] += record['core_hours'] * record['mem_req']
+
+   # - count wait time
+   projusers[project][user]['wait_hours'] += max((record['end_time'] - record['submission_time']) / float(3600), 0)
+
+   # - count wallclock time
+   projusers[project][user]['wall_hours'] += record['ru_wallclock'] / float(3600)
+   projusers[project][user]['wall_req_hours'] += sge.category_resource(record['category'], 'h_rt') / float(3600)
+
+   # - job size distribution
+   for (i, b) in enumerate(sizebins):
+      if record['job_size_adj'] >= b['start'] and record['job_size_adj'] < b['end']:
+         projusers[project][user]['job_size'][i] += record['core_hours_adj']
 
 
 def record_filter(record, date):

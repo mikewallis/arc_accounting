@@ -179,6 +179,42 @@ def records(accounting = os.environ["SGE_ROOT"] +
 
 
 # Generator
+# Walks all accounting records, returning a dictionary per record
+# Allows retrieval of all records, or just one at a time.
+def dbrecords(db, service, filter=None, modify=None):
+
+   # Database query
+   import MySQLdb as mariadb
+   cursor = db.cursor(mariadb.cursors.SSDictCursor)
+   cursor.execute(
+      """
+         SELECT
+            *
+         FROM
+            accounting_sge
+         WHERE
+            service = %(service)s
+      """,
+      {
+         'service': service,
+      }
+   )
+
+   for d in cursor:
+      # Modify record, e.g. add extra fields
+      if modify: modify(d)
+
+      # Filter out undesirable records
+      if filter:
+         if not filter(d): continue
+
+      # Return record
+      yield(d)
+
+   cursor.close()
+
+
+# Generator
 # Walks all job compute node allocation records, returning a dictionary per record
 # Allows retrieval of all records, or just one at a time.
 def allocs(allocs = "/var/log/local2"):
