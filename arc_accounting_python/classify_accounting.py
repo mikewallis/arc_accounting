@@ -45,6 +45,9 @@ def main():
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
+            # Obtain an up to date view of database state
+            db.rollback()
+
             # Do in batches, as cursor transfers entire set at once
             cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT 10000")
             for sql in cursor:
