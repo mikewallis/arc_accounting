@@ -13,6 +13,7 @@ import syslog
 import time
 import yaml
 import re
+import os
 
 
 def main():
@@ -42,14 +43,14 @@ def main():
       try:
          # Connect to database
          db = mariadb.connect(**credentials)
-         cursor = db.cursor(mariadb.cursors.SSDictCursor)
+         cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
             # Obtain an up to date view of database state
             db.rollback()
 
             # Classify waiting records
-            cursor.execute("SELECT * FROM job_data WHERE classified=FALSE")
+            cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT 10000")
             for sql in cursor:
                classify(db, sql)
 
@@ -70,10 +71,11 @@ mpirun_match = [
    { 'regex': '(^|/)cesm.exe$', 'match': 'cesm' },
    { 'regex': '(^|/)nek5000$', 'match': 'nek5000' },
    { 'regex': 'Had(ley|CM3L)[^/]*.exec', 'match': 'um' },
-   { 'regex': '/castep(/|.mpi$|$)', 'match': 'castep' },
+   { 'regex': '/(castep|CASTEP)([/-]|.mpi$|$)', 'match': 'castep' },
    { 'regex': '/OpenFOAM/', 'match': 'openfoam' },
    { 'regex': '/BISICLES/', 'match': 'bisicles' },
-   { 'regex': '/gulp(.mpi)?$/', 'match': 'gulp' },
+   { 'regex': '/gulp(.mpi)?$', 'match': 'gulp' },
+   { 'regex': '/gmx_mpi$', 'match': 'gromacs' },
 ]
 
 application_modules = [
@@ -168,6 +170,13 @@ def classify(db, record):
                   appsource = 'user'
                   parallel = 'mpi'
                   break
+
+         # Label with executable name instead
+         if not application:
+            #print(">>", file)
+            application = "mpi:" + os.path.basename(file)
+            appsource = 'user'
+            parallel = 'mpi'
 
 
    # Check module data
