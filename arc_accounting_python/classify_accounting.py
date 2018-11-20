@@ -42,14 +42,14 @@ def main():
       try:
          # Connect to database
          db = mariadb.connect(**credentials)
-         cursor = db.cursor(mariadb.cursors.DictCursor)
+         cursor = db.cursor(mariadb.cursors.SSDictCursor)
 
          while True:
             # Obtain an up to date view of database state
             db.rollback()
 
-            # Do in batches, as cursor transfers entire set at once
-            cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT 10000")
+            # Classify waiting records
+            cursor.execute("SELECT * FROM job_data WHERE classified=FALSE")
             for sql in cursor:
                classify(db, sql)
 
