@@ -23,6 +23,7 @@ def main():
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
+   parser.add_argument('--limit', action='store', type=int, default=1000, help="Max number of records to classify at once")
    args = parser.parse_args()
 
    if not args.service:
@@ -46,16 +47,18 @@ def main():
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
-            # Obtain an up to date view of database state
-            db.rollback()
+            while cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT %s", (args.limit, )):
 
-            # Classify waiting records
-            cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT 10000")
-            for sql in cursor:
-               classify(db, sql)
+               # Classify waiting records
+               for sql in cursor: classify(db, sql)
+
+               # Commit and obtain an up to date view of database state
+               db.commit()
+               db.rollback()
 
             if args.debug: print("sleeping...")
             time.sleep(args.sleep)
+
       except:
          syslog.syslog("Processing failed" + str(sys.exc_info()))
 
@@ -252,8 +255,6 @@ def classify(db, record):
 
    #if args.debug: print(record['id'], "class_app", application)
    print(record['id'], application, appsource, parallel)
-
-   db.commit()
 
 
 # Run program (if we've not been imported)
