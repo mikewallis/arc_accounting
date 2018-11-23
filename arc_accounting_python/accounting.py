@@ -233,6 +233,7 @@ def main():
          'slots',
          'cpu',
          'submission_time',
+         'hostname',
       ]
 
       for service in args.services:
