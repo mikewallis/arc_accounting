@@ -54,11 +54,12 @@ def main():
 
                # Commit and obtain an up to date view of database state
                db.commit()
-               db.rollback()
 
             if args.debug: print("sleeping...")
             time.sleep(args.sleep)
 
+            # Update view of database state
+            db.rollback()
       except:
          syslog.syslog("Processing failed" + str(sys.exc_info()))
 
