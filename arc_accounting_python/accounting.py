@@ -206,7 +206,7 @@ def main():
          print("reading from", accounting)
          for record in sge.records(accounting=accounting, modify=record_modify):
             for d in data:
-               if record_filter(record, d['date']):
+               if record_filter1(record, d['date']) and record_filter2(record, d['date']):
                   process_raw(record, d['projusers'], sizebins)
 
 
@@ -220,11 +220,26 @@ def main():
          credentials = yaml.safe_load(stream)
          db = mariadb.connect(**credentials)
 
+      fields = [
+         'qname',
+         'owner',
+         'project',
+         'maxvmem',
+         'end_time',
+         'ru_wallclock',
+         'category',
+         'job_number',
+         'task_number',
+         'slots',
+         'cpu',
+         'submission_time',
+      ]
+
       for service in args.services:
          print("reading database records for", service)
-         for record in sge.dbrecords(db, service, modify=record_modify):
-            for d in data:
-               if record_filter(record, d['date']):
+         for d in data:
+            for record in sge.dbrecords(db, service, filter_spec=filter_spec(d['date']), fields=fields, modify=record_modify):
+               if record_filter2(record, d['date']):
                   process_raw(record, d['projusers'], sizebins)
 
 
@@ -388,7 +403,8 @@ def process_raw(record, projusers, sizebins):
          projusers[project][user]['job_size'][i] += record['core_hours_adj']
 
 
-def record_filter(record, date):
+# Filtering replaced by filter_spec
+def record_filter1(record, date):
    # - Time filtering
    if record['end_time'] < date['start'] or record['end_time'] >= date['end']: return False
 
@@ -400,6 +416,11 @@ def record_filter(record, date):
    if args.skipusers and record['owner'] in args.skipusers: return False
    if args.users and record['owner'] not in args.users: return False
 
+   return True
+
+
+# Filtering that cannot be replaced by filter_spec
+def record_filter2(record, date):
    # - Project filtering
    if args.skipprojects and record['project'] in args.skipprojects: return False
    if args.projects and record['project'] not in args.projects: return False
@@ -409,6 +430,34 @@ def record_filter(record, date):
    if args.parents and record['parent'] not in args.parents: return False
 
    return True
+
+
+# Return filter specification usable by sge.dbrecord
+def filter_spec(date):
+   f = []
+
+   # - Time filtering
+   f.append({'end_time': { '>=': (date['start'],) }})
+   f.append({'end_time': { '<': (date['end'],) }})
+
+   # - Queue filtering
+   if args.skipqueues: f.append({'qname': { '!=': args.skipqueues }})
+   if args.queues: f.append({'qname': { '=': args.queues }})
+
+   # - User filtering
+   if args.skipusers: f.append({'owner': { '!=': args.skipusers }})
+   if args.users: f.append({'owner': { '=': args.users }})
+
+#record_modify must be called before this can happen
+#   # - Project filtering
+#   if args.skipprojects: f.append({'project': { '!=': args.skipprojects }})
+#   if args.projects: f.append({'project': { '=': args.projects }})
+
+#   # - Project parent filtering
+#   if args.skipparents: f.append({'parent': { '!=': args.skipparents }})
+#   if args.parents: f.append({'parent': { '=': args.parents }})
+
+   return f
 
 
 def record_modify(record):

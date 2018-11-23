@@ -181,32 +181,35 @@ def records(accounting = os.environ["SGE_ROOT"] +
 # Generator
 # Walks all accounting records, returning a dictionary per record
 # Allows retrieval of all records, or just one at a time.
-def dbrecords(db, service, filter=None, modify=None):
+def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
 
-   # Database query
+   # Generate query
+
+   select = "SELECT " + ", ".join(fields) + \
+            " FROM accounting_sge" + \
+            " WHERE "
+
+   where = [ "service = %s" ]
+   values = [ service ]
+   for sp in filter_spec:
+      for f, act in sp.items():
+         for op, vals in act.items():
+            values.extend(vals)
+            where.append("("+ " OR ".join([f +" "+ op + " %s"]*len(vals)) +")")
+
+   select += " AND ".join(where)
+
+   # Execute query
+
    import MySQLdb as mariadb
    cursor = db.cursor(mariadb.cursors.SSDictCursor)
-   cursor.execute(
-      """
-         SELECT
-            *
-         FROM
-            accounting_sge
-         WHERE
-            service = %(service)s
-      """,
-      {
-         'service': service,
-      }
-   )
+   cursor.execute(select, values)
+
+   # Modify and return records
 
    for d in cursor:
       # Modify record, e.g. add extra fields
       if modify: modify(d)
-
-      # Filter out undesirable records
-      if filter:
-         if not filter(d): continue
 
       # Return record
       yield(d)
