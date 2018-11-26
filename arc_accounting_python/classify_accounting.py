@@ -217,7 +217,7 @@ def classify(db, record):
       cursor.execute(
          """
             SELECT
-               slots
+               slots, granted_pe
             FROM
                accounting_sge
             WHERE
@@ -230,10 +230,13 @@ def classify(db, record):
 
       for acct in cursor:
          slots = acct[0]
+         granted_pe = acct[1]
          if slots == 1:
             parallel = 'serial'
+         elif granted_pe == "smp" or record['nodes_nodes'] == 1:
+            parallel = 'shared'
          else:
-            parallel = 'threaded'
+            parallel = 'distrib'
 
 
    # Save results, mark as classified
