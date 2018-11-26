@@ -369,6 +369,8 @@ def process_raw(record, projusers, sizebins):
    user = record['owner']
    project = record['project']
 
+   if args.printrecords: print(record)
+
    # Init data
 
    if project not in projusers:
