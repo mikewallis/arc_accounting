@@ -284,7 +284,7 @@ def main():
                      record['coproc_names'] = record['host'] + ":" + record['name']
 
                      if sql.get('coproc_names', None):
-                        record['coproc_names'] = ",".join(sorted(set([*sql['coproc_names'].split(','), record['coproc_names']])))
+                        record['coproc_names'] = "/".join(sorted(set([*sql['coproc_names'].split('/'), record['coproc_names']])))
 
                      # Skip if this is a record we've seen before
                      if record['coproc_names'] == sql.get('coproc_names', None): continue
