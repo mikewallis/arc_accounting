@@ -49,6 +49,8 @@ parser.add_argument('--bymonth', action='store_true', default=False, help="Repor
 parser.add_argument('--services', action='store', type=str, help="Services we are reporting on")
 parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
 parser.add_argument('--byapp', action='store_true', default=False, help="Report on applications, not users")
+parser.add_argument('--apps', action='store', type=str, help="Application(s) to report on")
+parser.add_argument('--skipapps', action='store', type=str, help="Application(s) to filter out")
 
 args = parser.parse_args()
 
@@ -190,6 +192,8 @@ def main():
    args.reports = commasep_list(args.reports)
    args.sizebins = commasep_list(args.sizebins)
    args.services = commasep_list(args.services)
+   args.apps = commasep_list(args.apps)
+   args.skipapps = commasep_list(args.skipapps)
 
    # Parse job size bins
    sizebins = parse_startend(args.sizebins, type='int')
@@ -438,6 +442,10 @@ def record_filter2(record, date):
    # - Project parent filtering
    if args.skipparents and record['parent'] in args.skipparents: return False
    if args.parents and record['parent'] not in args.parents: return False
+
+   # - Application filtering
+   if args.skipapps and record['class_app'] in args.skipapps: return False
+   if args.apps and record['class_app'] not in args.apps: return False
 
    return True
 
