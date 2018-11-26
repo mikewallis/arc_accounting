@@ -234,6 +234,10 @@ def main():
          'cpu',
          'submission_time',
          'hostname',
+
+         'class_app',
+         'class_parallel',
+         'class_appsource',
       ]
 
       for service in args.services:
@@ -241,6 +245,11 @@ def main():
          for d in data:
             for record in sge.dbrecords(db, service, filter_spec=filter_spec(d['date']), fields=fields, modify=record_modify):
                if record_filter2(record, d['date']):
+                  if args.byapp:
+                     record['owner'] = (record['class_app'] or 'unknown') \
+                        +"/"+ (record['class_parallel'] or 'unknown') \
+                        +"/"+ (record['class_appsource'] or 'unknown')
+
                   process_raw(record, d['projusers'], sizebins)
 
 

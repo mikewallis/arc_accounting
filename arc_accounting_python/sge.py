@@ -186,11 +186,11 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
    # Generate query
 
    select = "SELECT " + ", ".join(fields) + \
-            " FROM accounting_sge" + \
+            " FROM accounting_sge, job_data" + \
             " WHERE "
 
-   where = [ "service = %s" ]
-   values = [ service ]
+   where = [ "accounting_sge.job=job_data.job", "accounting_sge.service = %s", "job_data.service = %s" ]
+   values = [ service, service ]
    for sp in filter_spec:
       for f, act in sp.items():
          for op, vals in act.items():
@@ -203,6 +203,7 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
 
    import MySQLdb as mariadb
    cursor = db.cursor(mariadb.cursors.SSDictCursor)
+   #print(select,values)
    cursor.execute(select, values)
 
    # Modify and return records
