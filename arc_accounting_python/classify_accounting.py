@@ -47,7 +47,7 @@ def main():
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
-            while cursor.execute("SELECT * FROM job_data WHERE classified=FALSE LIMIT %s", (args.limit, )):
+            while cursor.execute("SELECT * FROM jobs WHERE classified=FALSE LIMIT %s", (args.limit, )):
 
                # Classify waiting records
                for sql in cursor: classify(db, sql)
@@ -146,9 +146,9 @@ def classify(db, record):
             SELECT
                mpirun.name
             FROM
-               job_to_mpirun, mpirun
+               job_to_mpirun, mpiruns
             WHERE
-               job_to_mpirun.mpirunid = mpirun.id
+               job_to_mpirun.mpirunid = mpiruns.id
             AND
                job_to_mpirun.jobid = %s
          """,
@@ -191,9 +191,9 @@ def classify(db, record):
             SELECT
                module.name
             FROM
-               job_to_module, module
+               job_to_module, modules
             WHERE
-               job_to_module.moduleid = module.id
+               job_to_module.moduleid = modules.id
             AND
                job_to_module.jobid = %s
          """,
@@ -219,7 +219,7 @@ def classify(db, record):
             SELECT
                slots, granted_pe
             FROM
-               accounting_sge
+               sge
             WHERE
                service = %(service)s
             AND
@@ -244,7 +244,7 @@ def classify(db, record):
    cursor.execute(
       """
          UPDATE
-            job_data
+            jobs
          SET
             classified=TRUE,
             class_app = %s,

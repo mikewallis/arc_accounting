@@ -186,10 +186,10 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
    # Generate query
 
    select = "SELECT " + ", ".join(fields) + \
-            " FROM accounting_sge, job_data" + \
+            " FROM sge, jobs" + \
             " WHERE "
 
-   where = [ "accounting_sge.job=job_data.job", "accounting_sge.service = %s", "job_data.service = %s" ]
+   where = [ "sge.job=jobs.job", "sge.service = %s", "jobs.service = %s" ]
    values = [ service, service ]
    for sp in filter_spec:
       for f, act in sp.items():

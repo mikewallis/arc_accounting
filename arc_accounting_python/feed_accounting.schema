@@ -2,7 +2,7 @@
 
 # Note: 'group' is a reserved word, so 'grp' used instead. 
  
-create table accounting_sge( 
+CREATE TABLE sge( 
    service VARCHAR(32), 
    record BIGINT UNSIGNED, 
    job VARCHAR(32),
@@ -53,13 +53,12 @@ create table accounting_sge(
    arid INT UNSIGNED, 
    ar_sub_time INT UNSIGNED 
 ); 
- 
-CREATE UNIQUE INDEX record ON accounting_sge (service, record); 
-CREATE INDEX job ON accounting_sge (service, job); 
-CREATE INDEX job_number ON accounting_sge (service, job_number); 
+CREATE UNIQUE INDEX sge_record ON sge (service, record); 
+CREATE INDEX sge_job ON sge (service, job); 
+CREATE INDEX sge_job_number ON sge (service, job_number); 
 
 # Table to maintain bookmarks of where we are in our data sources
-create table data_source_state( 
+CREATE TABLE data_source_state( 
    service VARCHAR(32), 
    host VARCHAR(32),
    name VARCHAR(1024),
@@ -68,17 +67,17 @@ create table data_source_state(
 );
 
 # Table to contain job data (from syslog, etc.)
-create table job_data(
+CREATE TABLE jobs(
    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    service VARCHAR(32), 
    job VARCHAR(32),
-   alloc VARCHAR(10240),
+
+   hosts INT UNSIGNED NOT NULL DEFAULT 0,
    nodes_nodes INT UNSIGNED,
    nodes_np INT UNSIGNED,
    nodes_ppn INT UNSIGNED,
    nodes_tpp INT UNSIGNED,
    coproc INT UNSIGNED NOT NULL DEFAULT 0,
-   coproc_names VARCHAR(10240),
    coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
    coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
    coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
@@ -89,31 +88,32 @@ create table job_data(
    class_app VARCHAR(32),
    class_appsource VARCHAR(32)
 );
+CREATE UNIQUE INDEX jobs_record on jobs (service, job);
+CREATE INDEX jobs_classified on jobs (service, classified);
 
-CREATE UNIQUE INDEX record on job_data (service, job);
-CREATE INDEX classified on job_data (service, classified);
 
 # Tables to contain job to mpirun mapping (many-to-many)
-create table job_to_mpirun(
+CREATE TABLE job_to_mpirun(
    jobid BIGINT NOT NULL,
    mpirunid BIGINT NOT NULL
 );
 CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
 
-create table mpirun(
+CREATE TABLE mpiruns(
    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
 
+
 # Tables to contain job to module mapping (many-to-many)
-create table job_to_module(
+CREATE TABLE job_to_module(
    jobid BIGINT NOT NULL,
    moduleid MEDIUMINT NOT NULL
 );
 CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
 
-create table modules(
+CREATE TABLE modules(
    id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
@@ -121,7 +121,7 @@ create table modules(
 
 
 # Tables to contain the job to allocation mapping (many-to-many)
-create table job_to_alloc(
+CREATE TABLE job_to_alloc(
    jobid BIGINT NOT NULL,
    hostid MEDIUMINT NOT NULL,
    queueid MEDIUMINT NOT NULL,
@@ -129,13 +129,13 @@ create table job_to_alloc(
 );
 CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
 
-create table queues(
+CREATE TABLE queues(
    id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
 
-create table hosts(
+CREATE TABLE hosts(
    id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
@@ -143,18 +143,18 @@ create table hosts(
 
 
 # Tables to contain the job to coproc mapping (many-to-many)
-create table job_to_coproc(
+CREATE TABLE job_to_coproc(
    jobid BIGINT NOT NULL,
    hostid MEDIUMINT NOT NULL,
    coprocid MEDIUMINT NOT NULL
 );
 CREATE UNIQUE INDEX job_coproc on job_to_coproc (jobid, hostid, coprocid);
 
-create table coprocs(
+CREATE TABLE coprocs(
    id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40),
-   name VARCHAR(1024),
    model_sha1 CHAR(40),
+   name VARCHAR(1024),
    model VARCHAR(1024)
 );
 CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);

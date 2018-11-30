@@ -91,7 +91,7 @@ def main():
    else:
       raise SystemExit("Error: provide a database credential file")
 
-   sge_add_record = "INSERT INTO accounting_sge (" + \
+   sge_add_record = "INSERT INTO sge (" + \
       ", ".join([f for f in fields]) + \
       ") VALUES (" + \
       ", ".join(['%(' + f + ')s' for f in fields]) + \
@@ -113,7 +113,7 @@ def main():
          if args.accountingfile:
             # Determine number of old sge records
             cursor.execute(
-               "SELECT count(*) FROM accounting_sge WHERE service = %s",
+               "SELECT count(*) FROM sge WHERE service = %s",
                (args.service, ),
             )
             acc_max_record = cursor.fetchall()[0]['count(*)']
@@ -164,14 +164,14 @@ def main():
                      # Record job as requiring classification
                      sge.sql_get_create(
                         cursor,
-                        "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
+                        "SELECT * FROM jobs WHERE service = %(service)s AND job = %(job)s",
                         {
                            'service': args.service,
                            'job': record['job'],
                            'classified': False,
                         },
-                        insert="INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
-                        update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
+                        insert="INSERT INTO jobs (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                        update="UPDATE jobs SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
                      )
 
                      db.commit()
@@ -204,9 +204,9 @@ def main():
                   # Retrieve/create existing record
                   sql = sge.sql_get_create(
                      cursor,
-                     "SELECT * FROM job_data WHERE service = %(service)s AND job = %(job)s",
+                     "SELECT * FROM jobs WHERE service = %(service)s AND job = %(job)s",
                      record,
-                     insert="INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                     insert="INSERT INTO jobs (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                      first=True,
                   )
 
@@ -216,9 +216,9 @@ def main():
                      # Get mpirun file record
                      mpirun = sge.sql_get_create(
                         cursor,
-                        "SELECT id, name FROM mpirun WHERE name = %(name)s",
+                        "SELECT id, name FROM mpiruns WHERE name = %(name)s",
                         { 'name': record['mpirun_file'] },
-                        insert="INSERT INTO mpirun (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                        insert="INSERT INTO mpiruns (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                         first=True,
                      )
 
@@ -229,19 +229,22 @@ def main():
                         "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
                         { 'jobid': sql['id'], 'mpirunid': mpirun['id'] },
                         insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
-                        oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                        oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
                      )
 
                      if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
 
                   elif record['type'] == "sgealloc":
                      if record['alloc']:
+                        hosts = sql['hosts']
+
                         for alloc in record['alloc'].split(','):
                            r = re.match(r"([^@]+)@([^=]+)=(\d+)", alloc)
                            if r:
                               q = r.group(1)
                               h = r.group(2)
                               slots = r.group(3)
+                              hosts += 1
 
                               # Get queue record
                               rec_q = sge.sql_get_create(
@@ -266,9 +269,15 @@ def main():
                               sge.sql_get_create(
                                  cursor,
                                  "SELECT * FROM job_to_alloc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND queueid = %(queueid)s",
-                                 { 'jobid': sql['id'], 'hostid': rec_h['id'], 'queueid': rec_q['id'], 'slots': slots },
+                                 {
+                                    'jobid': sql['id'],
+                                    'hostid': rec_h['id'],
+                                    'queueid': rec_q['id'],
+                                    'slots': slots,
+                                    'hosts': hosts,
+                                 },
                                  insert="INSERT INTO job_to_alloc (jobid, hostid, queueid, slots) VALUES (%(jobid)s, %(hostid)s, %(queueid)s, %(slots)s)",
-                                 oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                                 oninsert="UPDATE jobs SET classified=FALSE, hosts=%(hosts)s WHERE id = %(jobid)s",
                               )
 
                               if args.debug: print(record['job'], "update sgealloc")
@@ -291,9 +300,9 @@ def main():
                            # Get module record
                            mod = sge.sql_get_create(
                               cursor,
-                              "SELECT id, name FROM module WHERE name = %(name)s",
+                              "SELECT id, name FROM modules WHERE name = %(name)s",
                               { 'name': module },
-                              insert="INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                              insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                               first=True,
                            )
 
@@ -304,7 +313,7 @@ def main():
                               "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
                               { 'jobid': sql['id'], 'moduleid': mod['id'] },
                               insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
-                              oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                              oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
                            )
 
                         if args.debug: print(record['job'], "module", record['modules'])
@@ -344,7 +353,7 @@ def main():
                            'coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
                         },
                         insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s)",
-                        oninsert="UPDATE job_data SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE id = %(jobid)s",
+                        oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE id = %(jobid)s",
                      )
 
                      if args.debug: print(record['job'], "update gpu stats")
@@ -461,7 +470,7 @@ def syslog_records(file):
 
 def sql_update_job(cursor, update, data):
    cursor.execute(
-      "UPDATE job_data SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
+      "UPDATE jobs SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
       data,
    )
 
