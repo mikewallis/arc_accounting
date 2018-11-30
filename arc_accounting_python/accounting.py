@@ -251,8 +251,9 @@ def main():
                if record_filter2(record, d['date']):
                   if args.byapp:
                      record['owner'] = (record['class_app'] or 'unknown') \
-                        +"/"+ (record['class_parallel'] or 'unknown') \
-                        +"/"+ (record['class_appsource'] or 'unknown')
+                        +"("+ (record['class_parallel'] or 'unknown') \
+                        +"/"+ (record['class_appsource'] or 'unknown') \
+                        +")"
 
                   process_raw(record, d['projusers'], sizebins)
 
