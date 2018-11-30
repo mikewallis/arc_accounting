@@ -172,7 +172,6 @@ def main():
                         },
                         insert="INSERT INTO job_data (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
                         update="UPDATE job_data SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
-                        first=True,
                      )
 
                      db.commit()
@@ -231,7 +230,6 @@ def main():
                         { 'jobid': sql['id'], 'mpirunid': mpirun['id'] },
                         insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
                         oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
-                        first=True,
                      )
 
                      if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
@@ -271,7 +269,6 @@ def main():
                                  { 'jobid': sql['id'], 'hostid': rec_h['id'], 'queueid': rec_q['id'], 'slots': slots },
                                  insert="INSERT INTO job_to_alloc (jobid, hostid, queueid, slots) VALUES (%(jobid)s, %(hostid)s, %(queueid)s, %(slots)s)",
                                  oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
-                                 first=True,
                               )
 
                               if args.debug: print(record['job'], "update sgealloc")
@@ -294,9 +291,9 @@ def main():
                            # Get module record
                            mod = sge.sql_get_create(
                               cursor,
-                              "SELECT id, name FROM modules WHERE name = %(name)s",
+                              "SELECT id, name FROM module WHERE name = %(name)s",
                               { 'name': module },
-                              insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                              insert="INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                               first=True,
                            )
 
@@ -308,29 +305,49 @@ def main():
                               { 'jobid': sql['id'], 'moduleid': mod['id'] },
                               insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
                               oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
-                              first=True,
                            )
 
                         if args.debug: print(record['job'], "module", record['modules'])
 
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
 
-                     record['coproc_names'] = record['host'] + ":" + record['name']
+                     # Get host record
+                     rec_h = sge.sql_get_create(
+                        cursor,
+                        "SELECT id, name FROM hosts WHERE name = %(name)s",
+                        { 'name': record['host'] },
+                        insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                        first=True,
+                     )
 
-                     if sql.get('coproc_names', None):
-                        record['coproc_names'] = "/".join(sorted(set([*sql['coproc_names'].split('/'), record['coproc_names']])))
+                     # Get coproc record
+                     rec_cp = sge.sql_get_create(
+                        cursor,
+                        "SELECT id, name, model FROM coprocs WHERE name = %(name)s",
+                        { 'name': record['name'], 'model': record['model'] },
+                        insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s))",
+                        first=True,
+                     )
 
-                     # Skip if this is a record we've seen before
-                     if record['coproc_names'] == sql.get('coproc_names', None): continue
-
-                     # Convert gpu stats to coproc stats and add to record
-                     record['coproc_max_mem'] = sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]) # bytes
-                     record['coproc_cpu'] = sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]) # s
-                     record['coproc_mem'] = sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]) # Gib * s
-                     record['coproc_maxvmem'] = sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]) # bytes
+                     # Add to job record (and update coproc stats) if not seen this allocation before
+                     sge.sql_get_create(
+                        cursor,
+                        "SELECT jobid FROM job_to_coproc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND coprocid = %(coprocid)s",
+                        {
+                           'jobid': sql['id'],
+                           'hostid': rec_h['id'],
+                           'coprocid': rec_cp['id'],
+                           'coproc': sql['coproc'] +1,
+                           'coproc_max_mem': sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]), # bytes
+                           'coproc_cpu': sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]), # s
+                           'coproc_mem': sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]), # Gib * s
+                           'coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
+                        },
+                        insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s)",
+                        oninsert="UPDATE job_data SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE id = %(jobid)s",
+                     )
 
                      if args.debug: print(record['job'], "update gpu stats")
-                     sql_update_job(cursor, "coproc_names=%(coproc_names)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s", record)
 
                   else:
                      if args.debug: print("What the?", record['type'])
@@ -415,6 +432,7 @@ sgegpustats_def = re.compile(r"""
    job=(?P<job>\S+)\s+.*
    secs=(?P<secs>\S+)\s+.*
    name=(?P<name>\S+)\s+.*
+   model=(?P<model>\S+)\s+.*
    max_mem=(?P<coproc_max_mem>\S+)\s+.*
    sm=(?P<coproc_cpu>\S+)\s+.*
    fb=(?P<coproc_mem>\S+)\s+.*

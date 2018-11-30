@@ -77,6 +77,7 @@ create table job_data(
    nodes_np INT UNSIGNED,
    nodes_ppn INT UNSIGNED,
    nodes_tpp INT UNSIGNED,
+   coproc INT UNSIGNED NOT NULL DEFAULT 0,
    coproc_names VARCHAR(10240),
    coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
    coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
@@ -124,7 +125,7 @@ create table job_to_alloc(
    jobid BIGINT NOT NULL,
    hostid MEDIUMINT NOT NULL,
    queueid MEDIUMINT NOT NULL,
-   slots INT NOT NULL
+   slots INT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
 
@@ -139,3 +140,21 @@ create table hosts(
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
+
+
+# Tables to contain the job to coproc mapping (many-to-many)
+create table job_to_coproc(
+   jobid BIGINT NOT NULL,
+   hostid MEDIUMINT NOT NULL,
+   coprocid MEDIUMINT NOT NULL
+);
+CREATE UNIQUE INDEX job_coproc on job_to_coproc (jobid, hostid, coprocid);
+
+create table coprocs(
+   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40),
+   name VARCHAR(1024),
+   model_sha1 CHAR(40),
+   model VARCHAR(1024)
+);
+CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);
