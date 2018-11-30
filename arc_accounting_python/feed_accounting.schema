@@ -108,12 +108,34 @@ create table mpirun(
 # Tables to contain job to module mapping (many-to-many)
 create table job_to_module(
    jobid BIGINT NOT NULL,
-   moduleid BIGINT NOT NULL
+   moduleid MEDIUMINT NOT NULL
 );
 CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
 
-create table module(
-   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+create table modules(
+   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+
+# Tables to contain the job to allocation mapping (many-to-many)
+create table job_to_alloc(
+   jobid BIGINT NOT NULL,
+   hostid MEDIUMINT NOT NULL,
+   queueid MEDIUMINT NOT NULL,
+   slots INT NOT NULL
+);
+CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
+
+create table queues(
+   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+create table hosts(
+   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );

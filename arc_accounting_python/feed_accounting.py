@@ -238,9 +238,43 @@ def main():
 
                   elif record['type'] == "sgealloc":
                      if record['alloc']:
-                        if sql['alloc'] != record['alloc']:
-                           if args.debug: print(record['job'], "update sgealloc")
-                           sql_update_job(cursor, "alloc=%(alloc)s", record)
+                        for alloc in record['alloc'].split(','):
+                           r = re.match(r"([^@]+)@([^=]+)=(\d+)", alloc)
+                           if r:
+                              q = r.group(1)
+                              h = r.group(2)
+                              slots = r.group(3)
+
+                              # Get queue record
+                              rec_q = sge.sql_get_create(
+                                 cursor,
+                                 "SELECT id, name FROM queues WHERE name = %(name)s",
+                                 { 'name': q },
+                                 insert="INSERT INTO queues (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                                 first=True,
+                              )
+
+                              # Get host record
+                              rec_h = sge.sql_get_create(
+                                 cursor,
+                                 "SELECT id, name FROM hosts WHERE name = %(name)s",
+                                 { 'name': h },
+                                 insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                                 first=True,
+                              )
+
+                              # Add allocation to job record if needed
+                              # Mark job as needing fresh classification
+                              sge.sql_get_create(
+                                 cursor,
+                                 "SELECT * FROM job_to_alloc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND queueid = %(queueid)s",
+                                 { 'jobid': sql['id'], 'hostid': rec_h['id'], 'queueid': rec_q['id'], 'slots': slots },
+                                 insert="INSERT INTO job_to_alloc (jobid, hostid, queueid, slots) VALUES (%(jobid)s, %(hostid)s, %(queueid)s, %(slots)s)",
+                                 oninsert="UPDATE job_data SET classified=FALSE WHERE id = %(jobid)s",
+                                 first=True,
+                              )
+
+                              if args.debug: print(record['job'], "update sgealloc")
 
                   elif record['type'] == "sgenodes":
                      if record['nodes_nodes']:
@@ -260,9 +294,9 @@ def main():
                            # Get module record
                            mod = sge.sql_get_create(
                               cursor,
-                              "SELECT id, name FROM module WHERE name = %(name)s",
+                              "SELECT id, name FROM modules WHERE name = %(name)s",
                               { 'name': module },
-                              insert="INSERT INTO module (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                              insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                               first=True,
                            )
 
