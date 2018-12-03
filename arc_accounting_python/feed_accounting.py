@@ -330,10 +330,13 @@ def main():
                      )
 
                      # Get coproc record
+                     # (tag with hostname as coproc name is currently just a
+                     # index on a host. Not necessary if we started using the
+                     # card UUID instead)
                      rec_cp = sge.sql_get_create(
                         cursor,
                         "SELECT id, name, model FROM coprocs WHERE name = %(name)s",
-                        { 'name': record['name'], 'model': record['model'] },
+                        { 'name': record['host'] +":"+ record['name'], 'model': record['model'] },
                         insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s))",
                         first=True,
                      )
