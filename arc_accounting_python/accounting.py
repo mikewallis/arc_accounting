@@ -239,6 +239,9 @@ def main():
          'submission_time',
          'hostname',
 
+         'coproc',
+         'coproc_cpu',
+
          'class_app',
          'class_parallel',
          'class_appsource',
@@ -279,6 +282,8 @@ def main():
                   'wait_hours': 0,
                   'wall_hours': 0,
                   'wall_req_hours': 0,
+                  'coprocs': 0,
+                  'coproc_hours': 0,
                   'job_size': [0 for b in sizebins],
                }
 
@@ -291,6 +296,8 @@ def main():
             d['users'][user]['wait_hours'] += d['projusers'][project][user]['wait_hours']
             d['users'][user]['wall_hours'] += d['projusers'][project][user]['wall_hours']
             d['users'][user]['wall_req_hours'] += d['projusers'][project][user]['wall_req_hours']
+            d['users'][user]['coprocs'] += d['projusers'][project][user]['coprocs']
+            d['users'][user]['coproc_hours'] += d['projusers'][project][user]['coproc_hours']
 
             for (i, b) in enumerate(sizebins):
                d['users'][user]['job_size'][i] += d['projusers'][project][user]['job_size'][i]
@@ -309,6 +316,8 @@ def main():
             'wait_hours': 0,
             'wall_hours': 0,
             'wall_req_hours': 0,
+            'coprocs': 0,
+            'coproc_hours': 0,
             'job_size': [0 for b in sizebins],
          }
 
@@ -323,6 +332,8 @@ def main():
             d['projects'][project]['wait_hours'] += user['wait_hours']
             d['projects'][project]['wall_hours'] += user['wall_hours']
             d['projects'][project]['wall_req_hours'] += user['wall_req_hours']
+            d['projects'][project]['coprocs'] += user['coprocs']
+            d['projects'][project]['coproc_hours'] += user['coproc_hours']
 
             for (i, b) in enumerate(sizebins):
                d['projects'][project]['job_size'][i] += user['job_size'][i]
@@ -344,6 +355,8 @@ def main():
                'wait_hours': 0,
                'wall_hours': 0,
                'wall_req_hours': 0,
+               'coprocs': 0,
+               'coproc_hours': 0,
                'job_size': [0 for b in sizebins],
             }
 
@@ -357,6 +370,8 @@ def main():
          d['parents'][parent]['wait_hours'] += d['projects'][project]['wait_hours']
          d['parents'][parent]['wall_hours'] += d['projects'][project]['wall_hours']
          d['parents'][parent]['wall_req_hours'] += d['projects'][project]['wall_req_hours']
+         d['parents'][parent]['coprocs'] += d['projects'][project]['coprocs']
+         d['parents'][parent]['coproc_hours'] += d['projects'][project]['coproc_hours']
 
          for (i, b) in enumerate(sizebins):
             d['parents'][parent]['job_size'][i] += d['projects'][project]['job_size'][i]
@@ -388,6 +403,9 @@ def process_raw(record, projusers, sizebins):
          'wait_hours': 0,
          'wall_hours': 0,
          'wall_req_hours': 0,
+         'coprocs': 0,
+         'coproc_hours': 0,
+
          'job_size': [0 for b in sizebins],
       }
 
@@ -413,6 +431,10 @@ def process_raw(record, projusers, sizebins):
    # - count wallclock time
    projusers[project][user]['wall_hours'] += record['ru_wallclock'] / float(3600)
    projusers[project][user]['wall_req_hours'] += sge.category_resource(record['category'], 'h_rt') / float(3600)
+
+   # - coproc usage
+   projusers[project][user]['coprocs'] += record['coproc']
+   projusers[project][user]['coproc_hours'] += record['coproc_cpu'] / float(3600)
 
    # - job size distribution
    for (i, b) in enumerate(sizebins):
@@ -874,7 +896,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
 
 
 def summarise_parents(data, total_cores, bins):
-   headers = [ 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff', 'Coproc %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -895,6 +917,7 @@ def summarise_parents(data, total_cores, bins):
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
+         'Coproc %Eff': percent(d['coproc_hours'], d['coprocs'] * d['wall_hours']),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       }),
 
@@ -911,6 +934,7 @@ def summarise_parents(data, total_cores, bins):
       'Wall %Acc': percent(sum([data['parents'][p]['wall_req_hours'] for p in data['parents']]), sum([data['parents'][p]['wall_hours'] for p in data['parents']])),
       'Core %Eff': percent(sum([data['parents'][p]['cpu_hours'] for p in data['parents']]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['parents'][p]['mem_hours'] for p in data['parents']]), sum([data['parents'][p]['mem_req_hours'] for p in data['parents']])),
+      'Coproc %Eff': percent(sum([data['parents'][p]['coproc_hours'] for p in data['parents']]), sum([data['parents'][p]['coprocs'] * data['parents'][p]['wall_hours'] for p in data['parents']])),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -918,7 +942,7 @@ def summarise_parents(data, total_cores, bins):
 
 
 def summarise_projects(data, total_cores, bins):
-   headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff', 'Coproc %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -940,6 +964,7 @@ def summarise_projects(data, total_cores, bins):
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
+         'Coproc %Eff': percent(d['coproc_hours'], d['coprocs'] * d['wall_hours']),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       }),
 
@@ -957,6 +982,7 @@ def summarise_projects(data, total_cores, bins):
       'Wall %Acc': percent(sum([data['projects'][p]['wall_req_hours'] for p in data['projects']]), sum([data['projects'][p]['wall_hours'] for p in data['projects']])),
       'Core %Eff': percent(sum([data['projects'][p]['cpu_hours'] for p in data['projects']]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['projects'][p]['mem_hours'] for p in data['projects']]), sum([data['projects'][p]['mem_req_hours'] for p in data['projects']])),
+      'Coproc %Eff': percent(sum([data['projects'][p]['coproc_hours'] for p in data['projects']]), sum([data['projects'][p]['coprocs'] * data['projects'][p]['wall_hours'] for p in data['projects']])),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
@@ -964,7 +990,7 @@ def summarise_projects(data, total_cores, bins):
 
 
 def summarise_users(data, total_cores, bins):
-   headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff', 'Coproc %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -988,6 +1014,7 @@ def summarise_users(data, total_cores, bins):
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
+         'Coproc %Eff': percent(d['coproc_hours'], d['coprocs'] * d['wall_hours']),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       })
 
@@ -1004,13 +1031,14 @@ def summarise_users(data, total_cores, bins):
       'Wall %Acc': percent(sum([data['users'][u]['wall_req_hours'] for u in data['users']]), sum([data['users'][u]['wall_hours'] for u in data['users']])),
       'Core %Eff': percent(sum([data['users'][u]['cpu_hours'] for u in data['users']]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['users'][u]['mem_hours'] for u in data['users']]), sum([data['users'][u]['mem_req_hours'] for u in data['users']])),
+      'Coproc %Eff': percent(sum([data['users'][p]['coproc_hours'] for p in data['users']]), sum([data['users'][p]['coprocs'] * data['users'][p]['wall_hours'] for p in data['users']])),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
    return headers, table, totals
 
 def summarise_project(data, project, total_cores, bins):
-   headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
+   headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff', 'Coproc %Eff' ]
    if bins:
       headers.extend([b['name'] for b in bins])
 
@@ -1033,6 +1061,7 @@ def summarise_project(data, project, total_cores, bins):
          'Wall %Acc': percent(d['wall_req_hours'], d['wall_hours']),
          'Core %Eff': percent(d['cpu_hours'], d['core_hours_adj']),
          'Mem %Eff': percent(d['mem_hours'], d['mem_req_hours']),
+         'Coproc %Eff': percent(d['coproc_hours'], d['coprocs'] * d['wall_hours']),
          **{ b['name']: d['job_size'][i] for i, b in enumerate(bins) },
       })
 
@@ -1048,6 +1077,7 @@ def summarise_project(data, project, total_cores, bins):
       'Wall %Acc': percent(sum([data['projusers'][project][u]['wall_req_hours'] for u in data['projusers'][project]]), sum([data['projusers'][project][u]['wall_hours'] for u in data['projusers'][project]])),
       'Core %Eff': percent(sum([data['projusers'][project][u]['cpu_hours'] for u in data['projusers'][project]]), sum_key(table, 'Adj Core Hrs')),
       'Mem %Eff': percent(sum([data['projusers'][project][u]['mem_hours'] for u in data['projusers'][project]]), sum([data['projusers'][project][u]['mem_req_hours'] for u in data['projusers'][project]])),
+      'Coproc %Eff': percent(sum([data['projusers'][project][u]['coproc_hours'] for u in data['projusers'][project]]), sum([data['projusers'][project][u]['coprocs'] * data['projusers'][project][u]['wall_hours'] for u in data['projusers'][project]])),
       **{ b['name']: sum([d[b['name']] for d in table]) for i, b in enumerate(bins) },
    }
 
