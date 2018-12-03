@@ -144,7 +144,7 @@ def classify(db, record):
       cursor.execute(
          """
             SELECT
-               mpirun.name
+               mpiruns.name
             FROM
                job_to_mpirun, mpiruns
             WHERE
@@ -189,7 +189,7 @@ def classify(db, record):
       cursor.execute(
          """
             SELECT
-               module.name
+               modules.name
             FROM
                job_to_module, modules
             WHERE
