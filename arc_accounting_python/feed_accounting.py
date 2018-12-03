@@ -217,7 +217,9 @@ def main():
                      mpirun = sge.sql_get_create(
                         cursor,
                         "SELECT id, name FROM mpiruns WHERE name = %(name)s",
-                        { 'name': record['mpirun_file'] },
+                        {
+                           'name': record['mpirun_file'],
+                        },
                         insert="INSERT INTO mpiruns (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                         first=True,
                      )
@@ -227,7 +229,10 @@ def main():
                      sge.sql_get_create(
                         cursor,
                         "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
-                        { 'jobid': sql['id'], 'mpirunid': mpirun['id'] },
+                        {
+                           'jobid': sql['id'],
+                           'mpirunid': mpirun['id'],
+                        },
                         insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
                         oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
                      )
@@ -250,7 +255,9 @@ def main():
                               rec_q = sge.sql_get_create(
                                  cursor,
                                  "SELECT id, name FROM queues WHERE name = %(name)s",
-                                 { 'name': q },
+                                 {
+                                    'name': q,
+                                 },
                                  insert="INSERT INTO queues (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                                  first=True,
                               )
@@ -259,7 +266,9 @@ def main():
                               rec_h = sge.sql_get_create(
                                  cursor,
                                  "SELECT id, name FROM hosts WHERE name = %(name)s",
-                                 { 'name': h },
+                                 {
+                                    'name': h,
+                                 },
                                  insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                                  first=True,
                               )
@@ -301,7 +310,9 @@ def main():
                            mod = sge.sql_get_create(
                               cursor,
                               "SELECT id, name FROM modules WHERE name = %(name)s",
-                              { 'name': module },
+                              {
+                                 'name': module,
+                              },
                               insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                               first=True,
                            )
@@ -311,7 +322,10 @@ def main():
                            sge.sql_get_create(
                               cursor,
                               "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
-                              { 'jobid': sql['id'], 'moduleid': mod['id'] },
+                              {
+                                 'jobid': sql['id'],
+                                 'moduleid': mod['id'],
+                              },
                               insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
                               oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
                            )
@@ -324,7 +338,9 @@ def main():
                      rec_h = sge.sql_get_create(
                         cursor,
                         "SELECT id, name FROM hosts WHERE name = %(name)s",
-                        { 'name': record['host'] },
+                        {
+                           'name': record['host'],
+                        },
                         insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
                         first=True,
                      )
@@ -336,7 +352,10 @@ def main():
                      rec_cp = sge.sql_get_create(
                         cursor,
                         "SELECT id, name, model FROM coprocs WHERE name = %(name)s",
-                        { 'name': record['host'] +":"+ record['name'], 'model': record['model'] },
+                        {
+                           'name': record['host'] +":"+ record['name'],
+                           'model': record['model'],
+                        },
                         insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s))",
                         first=True,
                      )
