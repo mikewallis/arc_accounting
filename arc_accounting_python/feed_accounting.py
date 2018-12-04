@@ -381,6 +381,13 @@ def main():
 
                      if args.debug: print(record['job'], "update gpu stats")
 
+                  elif record['type'] == "sgeepilog":
+                     if record['epilog_copy']:
+                        if sql['epilog_copy'] != int(record['epilog_copy']):
+
+                           if args.debug: print(record['job'], "update sgeepilog")
+                           sql_update_job(cursor, "epilog_copy=%(epilog_copy)s", record)
+
                   else:
                      if args.debug: print("What the?", record['type'])
 
@@ -471,6 +478,16 @@ sgegpustats_def = re.compile(r"""
    maxfb=(?P<coproc_maxvmem>\S+)
 """, re.VERBOSE)
 
+# epilog copy data:
+#sgeepilog cluster=arc3_prod job=12121.1 copy disk_out 0 seconds
+
+sgeepilog_def = re.compile(r"""
+   (?P<type>sgeepilog).*
+   cluster=(?P<cluster>\S*)\s+
+   job=(?P<job>\S+)\s+
+   copy\s+disk_out\s+(?P<epilog_copy>\S+)\s+seconds
+""", re.VERBOSE)
+
 # Return syslog records we are interested in
 def syslog_records(file):
    for line in file:
@@ -480,7 +497,7 @@ def syslog_records(file):
 
          # Process different types of record:
 
-         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgegpustats_def ]:
+         for r_def in [ mpirun_def, sgemoduleload_def, sgealloc_def, sgenodes_def, sgemodules_def, sgegpustats_def, sgeepilog_def ]:
             r_match = r_def.match(r['data'])
 
             if r_match:

@@ -82,6 +82,7 @@ CREATE TABLE jobs(
    coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
    coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
    coproc_maxvmem DOUBLE NOT NULL DEFAULT 0.0,
+   epilog_copy DOUBLE NOT NULL DEFAULT 0.0,
    classified BOOL NOT NULL DEFAULT FALSE,
    class_parallel VARCHAR(8),
    class_ptype VARCHAR(16),
