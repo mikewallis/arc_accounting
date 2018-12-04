@@ -355,8 +355,9 @@ def main():
                         {
                            'name': record['host'] +":"+ record['name'],
                            'model': record['model'],
+                           'memory': 1024*1024*int(record['coproc_max_mem']), # bytes
                         },
-                        insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s))",
+                        insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1, memory) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s), %(memory)s)",
                         first=True,
                      )
 
