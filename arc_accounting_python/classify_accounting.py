@@ -47,7 +47,7 @@ def main():
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
          while True:
-            while cursor.execute("SELECT * FROM jobs WHERE classified=FALSE LIMIT %s", (args.limit, )):
+            while cursor.execute("SELECT * FROM jobs WHERE service = %s AND classified=FALSE LIMIT %s", (args.service, args.limit)):
 
                # Classify waiting records
                for sql in cursor: classify(db, sql)
