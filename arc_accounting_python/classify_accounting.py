@@ -109,11 +109,8 @@ application_modules = [
    'gate',
    'gaussian',
    'geant4',
-   'glpk',
    'gmt',
-   'gnuplot',
    'gpaw',
-   'grace',
    'gromacs',
    'h5utils',
    'idl',
@@ -139,8 +136,6 @@ application_modules = [
    'orca',
    'paraview',
    'paraview-osmesa',
-   'ploticus',
-   'qhull',
    'qiime',
    'relion',
    'rstudio',
@@ -156,6 +151,12 @@ application_modules = [
    'singularity',
    'R',
    'python',
+
+   'grace', # plotting
+   'gnuplot', # plotting
+   'ploticus', # plotting
+   'glpk', # library?
+   'qhull', # library?
 ]
 
 def classify(db, record):
