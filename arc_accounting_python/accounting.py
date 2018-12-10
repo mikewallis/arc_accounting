@@ -213,6 +213,11 @@ def main():
          for record in sge.records(accounting=accounting, modify=record_modify):
             for d in data:
                if record_filter1(record, d['date']) and record_filter2(record, d['date']):
+                  if args.byjob:
+                     record['owner'] = record['owner'] \
+                        +"("+ record['job'] \
+                        +")"
+
                   process_raw(record, d['projusers'], sizebins)
 
 
@@ -261,7 +266,7 @@ def main():
                         +"("+ (record['class_parallel'] or 'unknown') \
                         +"/"+ (record['class_appsource'] or 'unknown') \
                         +")"
-                  elif args.byjob:
+                  if args.byjob:
                      record['owner'] = record['owner'] \
                         +"("+ record['job'] \
                         +")"
