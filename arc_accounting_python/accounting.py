@@ -455,10 +455,12 @@ def process_raw(record, projusers, sizebins):
    projusers[project][user]['wall_req_hours'] += sge.category_resource(record['category'], 'h_rt') / float(3600)
 
    # - coproc usage
-   projusers[project][user]['coproc_hours'] += record['coproc_cpu'] / float(3600)
-   projusers[project][user]['coproc_req_hours'] += record['coproc'] * record['ru_wallclock'] / float(3600)
-   projusers[project][user]['coproc_mem_hours'] += record['ru_wallclock'] * record['coproc_maxvmem']
-   projusers[project][user]['coproc_mem_req_hours'] += record['ru_wallclock'] * record['coproc_max_mem']
+   #   (unavailable if not using database)
+   if 'coproc' in record:
+      projusers[project][user]['coproc_hours'] += record['coproc_cpu'] / float(3600)
+      projusers[project][user]['coproc_req_hours'] += record['coproc'] * record['ru_wallclock'] / float(3600)
+      projusers[project][user]['coproc_mem_hours'] += record['ru_wallclock'] * record['coproc_maxvmem']
+      projusers[project][user]['coproc_mem_req_hours'] += record['ru_wallclock'] * record['coproc_max_mem']
 
    # - job size distribution
    for (i, b) in enumerate(sizebins):
