@@ -87,7 +87,8 @@ CREATE TABLE jobs(
    class_parallel VARCHAR(8),
    class_ptype VARCHAR(16),
    class_app VARCHAR(32),
-   class_appsource VARCHAR(32)
+   class_appsource VARCHAR(32),
+   class_appdomain VARCHAR(32)
 );
 CREATE UNIQUE INDEX jobs_record on jobs (service, job);
 CREATE INDEX jobs_classified on jobs (service, classified);
