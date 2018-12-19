@@ -83,21 +83,21 @@ def reportmpi(credentials):
       print(file, "=>", application)
 
 mpirun_match = [
-   { 'regex': '/vasp[/_0-9]', 'match': 'vasp' },
-   { 'regex': '/relion[/_0-9]', 'match': 'relion' },
-   { 'regex': '/lammps[/_0-9]', 'match': 'lammps' },
-   { 'regex': '/(wrf|wrfmeteo|geogrid|metgrid).exe$', 'match': 'wrf' },
-   { 'regex': '[_/]wrf[_/0-9-].*/real.exe$', 'match': 'wrf' },
-   { 'regex': '(^|/)amrvac$', 'match': 'amrvac' },
-   { 'regex': '((^|/)cesm.exe$|/cesm[/0-9])', 'match': 'cesm' },
-   { 'regex': '(^|/)nek5000$', 'match': 'nek5000' },
-   { 'regex': 'Had(ley|CM3L)[^/]*.exec', 'match': 'um' },
-   { 'regex': '/(castep)([/-]|.mpi$|$)', 'match': 'castep' },
-   { 'regex': '/OpenFOAM/', 'match': 'openfoam' },
-   { 'regex': '/BISICLES/', 'match': 'bisicles' },
-   { 'regex': '/gulp(.mpi)?$', 'match': 'gulp' },
-   { 'regex': '/gmx_mpi$', 'match': 'gromacs' },
-   { 'regex': '/dedalus[_/-]', 'match': 'dedalus' },
+   { 'regex': '/vasp[/_0-9]', 'match': 'vasp', 'domain': 'materials' },
+   { 'regex': '/relion[/_0-9]', 'match': 'relion', 'domain': 'cryoem' },
+   { 'regex': '/lammps[/_0-9]', 'match': 'lammps', 'domain': 'materials' },
+   { 'regex': '/(wrf|wrfmeteo|geogrid|metgrid).exe$', 'match': 'wrf', 'domain': 'climate_ocean' },
+   { 'regex': '[_/]wrf[_/0-9-].*/real.exe$', 'match': 'wrf', 'domain': 'climate_ocean' },
+   { 'regex': '(^|/)amrvac$', 'match': 'amrvac', 'domain': 'fluids' },
+   { 'regex': '((^|/)cesm.exe$|/cesm[/0-9])', 'match': 'cesm', 'domain': 'climate_ocean' },
+   { 'regex': '(^|/)nek5000$', 'match': 'nek5000', 'domain': 'fluids' },
+   { 'regex': 'Had(ley|CM3L)[^/]*.exec', 'match': 'um', 'domain': 'climate_ocean' },
+   { 'regex': '/(castep)([/-]|.mpi$|$)', 'match': 'castep', 'domain': 'materials' },
+   { 'regex': '/OpenFOAM/', 'match': 'openfoam', 'domain': 'fluids' },
+   { 'regex': '/BISICLES/', 'match': 'bisicles', 'domain': 'climate_ocean' },
+   { 'regex': '/gulp(.mpi)?$', 'match': 'gulp', 'domain': 'materials' },
+   { 'regex': '/gmx_mpi$', 'match': 'gromacs', 'domain': 'molecular_dynam' },
+   { 'regex': '/dedalus[_/-]', 'match': 'dedalus', 'domain': 'fluids' },
    { 'regex': '/python[0-9.]*?$', 'match': 'python' }, # Last: very generic classification!
 ]
 
