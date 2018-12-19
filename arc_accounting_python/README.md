@@ -11,6 +11,7 @@ You may need to install following packages:
    pip install --user tabulate
    pip install --user python-dateutil
    pip install --user pytz
+   pip install --user mysqlclient
 
 Example usage to report on combined arc3 and arc2 usage (copy each
 service's accounting file to an appropriate location first):
