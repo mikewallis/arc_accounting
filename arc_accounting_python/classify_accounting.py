@@ -191,7 +191,7 @@ def classify(db, record):
 
          # Check if it's one of our applications
          if not application:
-            r = re.search('^/apps/(infrastructure|applications|system|developers/[^/]+)/([^/]+)/([^/]+)/', file)
+            r = re.search('^/apps[0-9]?/(infrastructure|applications|system|developers/[^/]+)/([^/]+)/([^/]+)/', file)
             if r:
                application = r.group(2)
                appsource = 'module'
