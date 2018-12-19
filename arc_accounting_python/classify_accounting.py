@@ -24,16 +24,21 @@ def main():
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
    parser.add_argument('--limit', action='store', type=int, default=1000, help="Max number of records to classify at once")
+   parser.add_argument('--reportmpi', action='store_true', default=False, help="Report on mpirun exes we don't have regexes for")
    args = parser.parse_args()
-
-   if not args.service:
-      raise SystemExit("Error: provide a service name argument")
 
    if args.credfile:
       with open(args.credfile, 'r') as stream:
          credentials = yaml.safe_load(stream)
    else:
       raise SystemExit("Error: provide a database credential file")
+
+   if args.reportmpi:
+      reportmpi(credentials)
+      raise SystemExit
+
+   if not args.service:
+      raise SystemExit("Error: provide a service name argument")
 
    syslog.openlog()
 
@@ -66,20 +71,34 @@ def main():
       time.sleep(args.sleep)
 
 
+def reportmpi(credentials):
+   # Connect to database
+   db = mariadb.connect(**credentials)
+   cursor = db.cursor()
+
+   cursor.execute("SELECT name FROM mpiruns")
+   for record in cursor:
+      file = record[0]
+      (application, appsource, parallel) = classify_mpirun(file)
+      print(file, "=>", application)
+
 mpirun_match = [
    { 'regex': '/vasp[/_0-9]', 'match': 'vasp' },
    { 'regex': '/relion[/_0-9]', 'match': 'relion' },
    { 'regex': '/lammps[/_0-9]', 'match': 'lammps' },
    { 'regex': '/(wrf|wrfmeteo|geogrid|metgrid).exe$', 'match': 'wrf' },
+   { 'regex': '[_/]wrf[_/0-9-].*/real.exe$', 'match': 'wrf' },
    { 'regex': '(^|/)amrvac$', 'match': 'amrvac' },
-   { 'regex': '(^|/)cesm.exe$', 'match': 'cesm' },
+   { 'regex': '((^|/)cesm.exe$|/cesm[/0-9])', 'match': 'cesm' },
    { 'regex': '(^|/)nek5000$', 'match': 'nek5000' },
    { 'regex': 'Had(ley|CM3L)[^/]*.exec', 'match': 'um' },
-   { 'regex': '/(castep|CASTEP)([/-]|.mpi$|$)', 'match': 'castep' },
+   { 'regex': '/(castep)([/-]|.mpi$|$)', 'match': 'castep' },
    { 'regex': '/OpenFOAM/', 'match': 'openfoam' },
    { 'regex': '/BISICLES/', 'match': 'bisicles' },
    { 'regex': '/gulp(.mpi)?$', 'match': 'gulp' },
    { 'regex': '/gmx_mpi$', 'match': 'gromacs' },
+   { 'regex': '/dedalus[_/-]', 'match': 'dedalus' },
+   { 'regex': '/python[0-9.]*?$', 'match': 'python' }, # Last: very generic classification!
 ]
 
 application_modules = [
@@ -159,6 +178,30 @@ application_modules = [
    'qhull', # library?
 ]
 
+def classify_mpirun(file):
+   application = None
+   appsource = None
+   parallel = None
+
+   # Check if it's one of our applications
+   r = re.search('^/apps[0-9]?/(infrastructure|applications|system|developers/[^/]+)/([^/]+)/([^/]+)/', file)
+   if r:
+      application = r.group(2)
+      appsource = 'module'
+      parallel = 'mpi'
+
+   # Check if it's obvious from filename
+   if not application:
+      for m in mpirun_match:
+         if re.search(m['regex'], file, re.IGNORECASE):
+            application = m['match']
+            appsource = 'user'
+            parallel = 'mpi'
+            break
+
+   return (application, appsource, parallel)
+
+
 def classify(db, record):
 
    cursor = db.cursor()
@@ -189,22 +232,8 @@ def classify(db, record):
       for rec in cursor:
          file = rec[0]
 
-         # Check if it's one of our applications
-         if not application:
-            r = re.search('^/apps[0-9]?/(infrastructure|applications|system|developers/[^/]+)/([^/]+)/([^/]+)/', file)
-            if r:
-               application = r.group(2)
-               appsource = 'module'
-               parallel = 'mpi'
-
-         # Check if it's obvious from filename
-         if not application:
-            for m in mpirun_match:
-               if re.search(m['regex'], file):
-                  application = m['match']
-                  appsource = 'user'
-                  parallel = 'mpi'
-                  break
+         # Attempt to label application based on mpirun
+         (application, appsource, parallel) = classify_mpirun(file)
 
          # Label with executable name instead
          if not application:
