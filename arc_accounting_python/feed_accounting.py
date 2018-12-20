@@ -15,6 +15,7 @@ import time
 import yaml
 import re
 import socket
+import os
 
 
 # Initialise data
@@ -77,6 +78,7 @@ def main():
    parser.add_argument('--service', action='store', type=str, help="Service name to tag records")
    parser.add_argument('--accountingfile', action='store', type=str, help="Accounting file to read from")
    parser.add_argument('--syslogfile', action='store', type=str, help="Syslog file to read from")
+   parser.add_argument('--sawrapdir', action='store', type=str, help="qstat3 sawrap dir to read node availability data from")
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
@@ -107,6 +109,17 @@ def main():
          # Connect to database
          db = mariadb.connect(**credentials)
          cursor = db.cursor(mariadb.cursors.DictCursor)
+
+         # Get service id
+         sql = sge.sql_get_create(
+            cursor,
+            "SELECT id FROM services WHERE name = %s",
+            (args.service,),
+            insert="INSERT INTO services (name) VALUES (%s)",
+            first=True,
+         )
+         serviceid = sql['id']
+         db.commit()
 
          # Initialise state
 
@@ -252,26 +265,10 @@ def main():
                               hosts += 1
 
                               # Get queue record
-                              rec_q = sge.sql_get_create(
-                                 cursor,
-                                 "SELECT id, name FROM queues WHERE name = %(name)s",
-                                 {
-                                    'name': q,
-                                 },
-                                 insert="INSERT INTO queues (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
-                                 first=True,
-                              )
+                              rec_q = sql_insert_queue(cursor, q)
 
                               # Get host record
-                              rec_h = sge.sql_get_create(
-                                 cursor,
-                                 "SELECT id, name FROM hosts WHERE name = %(name)s",
-                                 {
-                                    'name': h,
-                                 },
-                                 insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
-                                 first=True,
-                              )
+                              rec_h = sql_insert_host(cursor, h)
 
                               # Add allocation to job record if needed
                               # Mark job as needing fresh classification
@@ -335,15 +332,7 @@ def main():
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
 
                      # Get host record
-                     rec_h = sge.sql_get_create(
-                        cursor,
-                        "SELECT id, name FROM hosts WHERE name = %(name)s",
-                        {
-                           'name': record['host'],
-                        },
-                        insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
-                        first=True,
-                     )
+                     rec_h = sql_insert_host(cursor, record['host'])
 
                      # Get coproc record
                      # (tag with hostname as coproc name is currently just a
@@ -397,12 +386,103 @@ def main():
 
                   db.commit()
 
+            # Node availability data
+            if args.sawrapdir:
+               process_sawrapdir(args, db, cursor, serviceid)
+
             if args.debug: print("sleeping...")
             time.sleep(args.sleep)
       except:
          syslog.syslog("Processing failed" + str(sys.exc_info()))
 
       time.sleep(args.sleep)
+
+
+def process_sawrapdir(args, db, cursor, serviceid):
+   # Check we have all historical data
+   for fname in os.listdir(args.sawrapdir):
+      qstat3 = os.path.join(args.sawrapdir, fname)
+
+      # Retrieve progress
+      sql = sge.sql_get_create(
+         cursor,
+         "SELECT active,state FROM data_source_state WHERE service = %s AND host = %s AND name = %s",
+         (args.service, socket.getfqdn(), qstat3 ),
+         insert="INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
+         first=True,
+      )
+
+      # Skip if file no longer active
+      if not sql['active']: continue
+
+      if args.debug: print("Processing", qstat3)
+      line_num = 0
+
+      for line in sge.open_file(qstat3):
+         line_num += 1
+         if line_num <= sql['state']: continue
+
+         r = re.match(r"""
+               (?P<time>\d+)\s+
+               (?P<queue>\S+)@
+               (?P<host>\S+?)\.\S+\s+
+               [BIPC]+\s+
+               (?P<slots_reserved>\d+)/
+               (?P<slots_used>\d+)/
+               (?P<slots_total>\d+)\s+
+               \S+\s+
+               \S+\s+
+               (?P<flags>\S+)?
+            """,
+            line,
+            re.VERBOSE,
+         )
+         if r:
+            d = r.groupdict()
+
+            # Lookup relationships (DEBUG - cache last value)
+            rec_q = sql_insert_queue(cursor, d['queue'])
+            rec_h = sql_insert_host(cursor, d['host'])
+
+            # Fill out status
+            d['serviceid'] = serviceid
+            d['queueid'] = rec_q['id']
+            d['hostid'] = rec_h['id']
+            d['ttl'] = 10*60 # 10 minutes by default
+            d['enabled'] = True
+            d['available'] = True
+            if d['flags']:
+               d['enabled'] = "d" not in d['flags']
+               if re.match(r"[cdsuE]", d['flags']):
+                  d['available'] = False
+               else:
+                  d['available'] = True
+
+            # Insert record if not already there
+            sge.sql_get_create(
+               cursor,
+               "SELECT * FROM availability WHERE serviceid = %(serviceid)s AND time = %(time)s AND hostid = %(hostid)s AND queueid = %(queueid)s",
+               d,
+               insert="INSERT INTO availability (serviceid, time, hostid, queueid, slots_reserved, slots_used, slots_total, enabled, available, ttl) VALUES (%(serviceid)s, %(time)s, %(hostid)s, %(queueid)s, %(slots_reserved)s, %(slots_used)s, %(slots_total)s, %(enabled)s, %(available)s, %(ttl)s)",
+            )
+            db.commit()
+
+      # If file is older than 3 days, mark as inactive
+      # (to avoid reprocessing stuff all the time)
+      st = os.stat(qstat3)
+      active = True
+      if time.time() - max([st.st_mtime, st.st_ctime]) > 3*24*3600: active = False
+
+      # Record progress (lazy - do at end of file)
+      cursor.execute(
+         "UPDATE data_source_state SET active=%s,state=%s WHERE service = %s AND host = %s AND name = %s",
+         (active, line_num, args.service, socket.getfqdn(), qstat3),
+      )
+
+      db.commit()
+
+   # Tail today's file
+   ##DEBUG
 
 # Extract common features from syslog record
 # Jul 16 14:35:52 login1 someone: <data>
@@ -517,6 +597,31 @@ def sql_update_job(cursor, update, data):
       "UPDATE jobs SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
       data,
    )
+
+
+def sql_insert_queue(cursor, queue):
+   return(sge.sql_get_create(
+      cursor,
+      "SELECT id, name FROM queues WHERE name = %(name)s",
+      {
+         'name': queue,
+      },
+      insert="INSERT INTO queues (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+      first=True,
+   ))
+
+
+def sql_insert_host(cursor, host):
+   return(sge.sql_get_create(
+      cursor,
+      "SELECT id, name FROM hosts WHERE name = %(name)s",
+      {
+         'name': host,
+      },
+      insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+      first=True,
+   ))
+
 
 # Run program (if we've not been imported)
 # ---------------------------------------
