@@ -370,13 +370,17 @@ def main():
                            'hostid': rec_h['id'],
                            'coprocid': rec_cp['id'],
                            'coproc': sql['coproc'] +1,
-                           'coproc_max_mem': sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]), # bytes
-                           'coproc_cpu': sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]), # s
-                           'coproc_mem': sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]), # Gib * s
-                           'coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
+                           'coproc_max_mem': 1024*1024*int(record['coproc_max_mem']), # bytes
+                           'coproc_cpu': float(record['coproc_cpu'])/100, # s
+                           'coproc_mem': float(record['coproc_mem'])/(100*1024), # Gib * s
+                           'coproc_maxvmem': 1024*1024*int(record['coproc_maxvmem']), # bytes
+                           'sum_coproc_max_mem': sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]), # bytes
+                           'sum_coproc_cpu': sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]), # s
+                           'sum_coproc_mem': sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]), # Gib * s
+                           'sum_coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
                         },
-                        insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s)",
-                        oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(coproc_max_mem)s, coproc_cpu=%(coproc_cpu)s, coproc_mem=%(coproc_mem)s, coproc_maxvmem=%(coproc_maxvmem)s WHERE id = %(jobid)s",
+                        insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid, coproc_max_mem, coproc_cpu, coproc_mem, coproc_maxvmem) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s, %(coproc_max_mem)s, %(coproc_cpu)s, %(coproc_mem)s, %(coproc_maxvmem)s)",
+                        oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(sum_coproc_max_mem)s, coproc_cpu=%(sum_coproc_cpu)s, coproc_mem=%(sum_coproc_mem)s, coproc_maxvmem=%(sum_coproc_maxvmem)s WHERE id = %(jobid)s",
                      )
 
                      if args.debug: print(record['job'], "update gpu stats")
