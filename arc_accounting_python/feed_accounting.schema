@@ -175,7 +175,6 @@ CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);
 
 # Tables to contain node availability data
 CREATE TABLE availability(
-   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    serviceid SMALLINT UNSIGNED NOT NULL,
    time INT UNSIGNED NOT NULL, 
 
