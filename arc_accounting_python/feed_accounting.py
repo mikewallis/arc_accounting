@@ -440,7 +440,7 @@ def process_sawrapdir(args, db, cursor, serviceid):
          if r:
             d = r.groupdict()
 
-            # Lookup relationships (DEBUG - cache last value)
+            # Lookup relationships
             rec_q = sql_insert_queue(cursor, d['queue'])
             rec_h = sql_insert_host(cursor, d['host'])
 
@@ -453,10 +453,7 @@ def process_sawrapdir(args, db, cursor, serviceid):
             d['available'] = True
             if d['flags']:
                d['enabled'] = "d" not in d['flags']
-               if re.match(r"[cdsuE]", d['flags']):
-                  d['available'] = False
-               else:
-                  d['available'] = True
+               if re.match(r"[cdsuE]", d['flags']): d['available'] = False
 
             # Insert record if not already there
             sge.sql_get_create(
@@ -481,8 +478,6 @@ def process_sawrapdir(args, db, cursor, serviceid):
 
       db.commit()
 
-   # Tail today's file
-   ##DEBUG
 
 # Extract common features from syslog record
 # Jul 16 14:35:52 login1 someone: <data>
