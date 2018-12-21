@@ -74,7 +74,7 @@ CREATE TABLE data_source_state(
 
 # Table to contain job data (from syslog, etc.)
 CREATE TABLE jobs(
-   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    service VARCHAR(32), 
    job VARCHAR(32),
 
@@ -102,13 +102,13 @@ CREATE INDEX jobs_classified on jobs (service, classified);
 
 # Tables to contain job to mpirun mapping (many-to-many)
 CREATE TABLE job_to_mpirun(
-   jobid BIGINT NOT NULL,
-   mpirunid BIGINT NOT NULL
+   jobid BIGINT UNSIGNED NOT NULL,
+   mpirunid BIGINT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
 
 CREATE TABLE mpiruns(
-   id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
@@ -116,13 +116,13 @@ CREATE TABLE mpiruns(
 
 # Tables to contain job to module mapping (many-to-many)
 CREATE TABLE job_to_module(
-   jobid BIGINT NOT NULL,
-   moduleid MEDIUMINT NOT NULL
+   jobid BIGINT UNSIGNED NOT NULL,
+   moduleid MEDIUMINT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
 
 CREATE TABLE modules(
-   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
@@ -130,21 +130,21 @@ CREATE TABLE modules(
 
 # Tables to contain the job to allocation mapping (many-to-many)
 CREATE TABLE job_to_alloc(
-   jobid BIGINT NOT NULL,
-   hostid MEDIUMINT NOT NULL,
-   queueid MEDIUMINT NOT NULL,
+   jobid BIGINT UNSIGNED NOT NULL,
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   queueid MEDIUMINT UNSIGNED NOT NULL,
    slots INT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
 
 CREATE TABLE queues(
-   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
 
 CREATE TABLE hosts(
-   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40) UNIQUE KEY,
    name VARCHAR(1024)
 );
@@ -152,9 +152,9 @@ CREATE TABLE hosts(
 
 # Tables to contain the job to coproc mapping (many-to-many)
 CREATE TABLE job_to_coproc(
-   jobid BIGINT NOT NULL,
-   hostid MEDIUMINT NOT NULL,
-   coprocid MEDIUMINT NOT NULL,
+   jobid BIGINT UNSIGNED NOT NULL,
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   coprocid MEDIUMINT UNSIGNED NOT NULL,
    coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
    coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
    coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
@@ -163,7 +163,7 @@ CREATE TABLE job_to_coproc(
 CREATE UNIQUE INDEX job_coproc on job_to_coproc (jobid, hostid, coprocid);
 
 CREATE TABLE coprocs(
-   id MEDIUMINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name_sha1 CHAR(40),
    model_sha1 CHAR(40),
    name VARCHAR(1024),
@@ -178,8 +178,8 @@ CREATE TABLE availability(
    serviceid SMALLINT UNSIGNED NOT NULL,
    time INT UNSIGNED NOT NULL, 
 
-   hostid MEDIUMINT NOT NULL,
-   queueid MEDIUMINT NOT NULL,
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   queueid MEDIUMINT UNSIGNED NOT NULL,
 
    slots_reserved SMALLINT UNSIGNED NOT NULL DEFAULT 0,
    slots_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
