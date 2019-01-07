@@ -21,7 +21,7 @@ import os
 # Initialise data
 
 fields = [
-   'service',
+   'serviceid',
    'record',
    'job',
 
@@ -126,8 +126,8 @@ def main():
          if args.accountingfile:
             # Determine number of old sge records
             cursor.execute(
-               "SELECT count(*) FROM sge WHERE service = %s",
-               (args.service, ),
+               "SELECT count(*) FROM sge WHERE serviceid = %s",
+               (serviceid, ),
             )
             acc_max_record = cursor.fetchall()[0]['count(*)']
             syslog.syslog("Found " + str(acc_max_record) + " old sge " + \
@@ -142,9 +142,9 @@ def main():
 
             sql = sge.sql_get_create(
                cursor,
-               "SELECT * FROM data_source_state WHERE service = %s AND host = %s AND name = %s",
-               (args.service, socket.getfqdn(), args.syslogfile ),
-               insert="INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
+               "SELECT * FROM data_source_state WHERE serviceid = %s AND host = %s AND name = %s",
+               (serviceid, socket.getfqdn(), args.syslogfile ),
+               insert="INSERT INTO data_source_state (serviceid, host, name) VALUES (%s, %s, %s)",
                first=True,
             )
 
@@ -167,6 +167,7 @@ def main():
                   if acc_record_num >= acc_max_record:
 
                      record['service'] = args.service
+                     record['serviceid'] = serviceid
                      record['record'] = acc_record_num
                      record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
 
@@ -177,14 +178,14 @@ def main():
                      # Record job as requiring classification
                      sge.sql_get_create(
                         cursor,
-                        "SELECT * FROM jobs WHERE service = %(service)s AND job = %(job)s",
+                        "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
                         {
-                           'service': args.service,
+                           'serviceid': serviceid,
                            'job': record['job'],
                            'classified': False,
                         },
-                        insert="INSERT INTO jobs (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
-                        update="UPDATE jobs SET classified=%(classified)s WHERE service = %(service)s AND job = %(job)s",
+                        insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
+                        update="UPDATE jobs SET classified=%(classified)s WHERE serviceid = %(serviceid)s AND job = %(job)s",
                      )
 
                      db.commit()
@@ -205,21 +206,22 @@ def main():
 
                   # Record line as processed
                   cursor.execute(
-                     "UPDATE data_source_state SET state=%s WHERE service = %s AND host = %s AND name = %s",
-                     (sys_record_num, args.service, socket.getfqdn(), args.syslogfile ),
+                     "UPDATE data_source_state SET state=%s WHERE serviceid = %s AND host = %s AND name = %s",
+                     (sys_record_num, serviceid, socket.getfqdn(), args.syslogfile ),
                   )
 
                   # Allocate to service, flag as needing classification if
                   # we update the record
                   record['service'] = args.service
+                  record['serviceid'] = serviceid
                   record['classified'] = False
 
                   # Retrieve/create existing record
                   sql = sge.sql_get_create(
                      cursor,
-                     "SELECT * FROM jobs WHERE service = %(service)s AND job = %(job)s",
+                     "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
                      record,
-                     insert="INSERT INTO jobs (service, job, classified) VALUES (%(service)s, %(job)s, %(classified)s)",
+                     insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
                      first=True,
                   )
 
@@ -406,9 +408,9 @@ def process_sawrapdir(args, db, cursor, serviceid):
       # Retrieve progress
       sql = sge.sql_get_create(
          cursor,
-         "SELECT active,state FROM data_source_state WHERE service = %s AND host = %s AND name = %s",
-         (args.service, socket.getfqdn(), qstat3 ),
-         insert="INSERT INTO data_source_state (service, host, name) VALUES (%s, %s, %s)",
+         "SELECT active,state FROM data_source_state WHERE serviceid = %s AND host = %s AND name = %s",
+         (serviceid, socket.getfqdn(), qstat3 ),
+         insert="INSERT INTO data_source_state (serviceid, host, name) VALUES (%s, %s, %s)",
          first=True,
       )
 
@@ -472,8 +474,8 @@ def process_sawrapdir(args, db, cursor, serviceid):
 
       # Record progress (lazy - do at end of file)
       cursor.execute(
-         "UPDATE data_source_state SET active=%s,state=%s WHERE service = %s AND host = %s AND name = %s",
-         (active, line_num, args.service, socket.getfqdn(), qstat3),
+         "UPDATE data_source_state SET active=%s,state=%s WHERE serviceid = %s AND host = %s AND name = %s",
+         (active, line_num, serviceid, socket.getfqdn(), qstat3),
       )
 
       db.commit()
@@ -589,7 +591,7 @@ def syslog_records(file):
 
 def sql_update_job(cursor, update, data):
    cursor.execute(
-      "UPDATE jobs SET classified=%(classified)s, " + update + " WHERE service = %(service)s AND job = %(job)s",
+      "UPDATE jobs SET classified=%(classified)s, " + update + " WHERE serviceid = %(serviceid)s AND job = %(job)s",
       data,
    )
 

@@ -182,6 +182,15 @@ def records(accounting = os.environ["SGE_ROOT"] +
 # Walks all accounting records, returning a dictionary per record
 # Allows retrieval of all records, or just one at a time.
 def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
+   import MySQLdb as mariadb
+   cursor = db.cursor(mariadb.cursors.SSDictCursor)
+
+   # Lookup serviceid
+
+   serviceid = -1
+   cursor.execute("SELECT id FROM services WHERE name = %s", (service,))
+   for d in cursor:
+      serviceid = d['id']
 
    # Generate query
 
@@ -189,8 +198,8 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
             " FROM sge, jobs" + \
             " WHERE "
 
-   where = [ "sge.job=jobs.job", "sge.service = %s", "jobs.service = %s" ]
-   values = [ service, service ]
+   where = [ "sge.job=jobs.job", "sge.serviceid = %s", "jobs.serviceid = %s" ]
+   values = [ serviceid, serviceid ]
    for sp in filter_spec:
       for f, act in sp.items():
          for op, vals in act.items():
@@ -201,9 +210,7 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
 
    # Execute query
 
-   import MySQLdb as mariadb
-   cursor = db.cursor(mariadb.cursors.SSDictCursor)
-   #print(select,values)
+   print(select,values)
    cursor.execute(select, values)
 
    # Modify and return records

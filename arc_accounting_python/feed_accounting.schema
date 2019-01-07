@@ -9,7 +9,7 @@ CREATE TABLE services(
 );
  
 CREATE TABLE sge( 
-   service VARCHAR(32), 
+   serviceid SMALLINT UNSIGNED NOT NULL,
    record BIGINT UNSIGNED, 
    job VARCHAR(32),
 
@@ -59,13 +59,13 @@ CREATE TABLE sge(
    arid INT UNSIGNED, 
    ar_sub_time INT UNSIGNED 
 ); 
-CREATE UNIQUE INDEX sge_record ON sge (service, record); 
-CREATE INDEX sge_job ON sge (service, job); 
-CREATE INDEX sge_job_number ON sge (service, job_number); 
+CREATE UNIQUE INDEX sge_record ON sge (serviceid, record); 
+CREATE INDEX sge_job ON sge (serviceid, job); 
+CREATE INDEX sge_job_number ON sge (serviceid, job_number); 
 
 # Table to maintain bookmarks of where we are in our data sources
 CREATE TABLE data_source_state( 
-   service VARCHAR(32), 
+   serviceid SMALLINT UNSIGNED NOT NULL,
    host VARCHAR(32),
    name VARCHAR(1024),
    active BOOL NOT NULL DEFAULT TRUE,
@@ -75,7 +75,7 @@ CREATE TABLE data_source_state(
 # Table to contain job data (from syslog, etc.)
 CREATE TABLE jobs(
    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   service VARCHAR(32), 
+   serviceid SMALLINT UNSIGNED NOT NULL,
    job VARCHAR(32),
 
    hosts INT UNSIGNED NOT NULL DEFAULT 0,
@@ -96,8 +96,8 @@ CREATE TABLE jobs(
    class_appsource VARCHAR(32),
    class_appdomain VARCHAR(32)
 );
-CREATE UNIQUE INDEX jobs_record on jobs (service, job);
-CREATE INDEX jobs_classified on jobs (service, classified);
+CREATE UNIQUE INDEX jobs_record on jobs (serviceid, job);
+CREATE INDEX jobs_classified on jobs (serviceid, classified);
 
 
 # Tables to contain job to mpirun mapping (many-to-many)
