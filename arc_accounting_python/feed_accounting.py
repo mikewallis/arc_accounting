@@ -267,10 +267,10 @@ def main():
                               hosts += 1
 
                               # Get queue record
-                              rec_q = sql_insert_queue(cursor, q)
+                              rec_q = sql_insert_queue(cursor, serviceid, q)
 
                               # Get host record
-                              rec_h = sql_insert_host(cursor, h)
+                              rec_h = sql_insert_host(cursor, serviceid, h)
 
                               # Add allocation to job record if needed
                               # Mark job as needing fresh classification
@@ -334,7 +334,7 @@ def main():
                   elif record['type'] == "sge-allocator: Resource stats nvidia":
 
                      # Get host record
-                     rec_h = sql_insert_host(cursor, record['host'])
+                     rec_h = sql_insert_host(cursor, serviceid, record['host'])
 
                      # Get coproc record
                      # (tag with hostname as coproc name is currently just a
@@ -443,8 +443,8 @@ def process_sawrapdir(args, db, cursor, serviceid):
             d = r.groupdict()
 
             # Lookup relationships
-            rec_q = sql_insert_queue(cursor, d['queue'])
-            rec_h = sql_insert_host(cursor, d['host'])
+            rec_q = sql_insert_queue(cursor, serviceid, d['queue'])
+            rec_h = sql_insert_host(cursor, serviceid, d['host'])
 
             # Fill out status
             d['serviceid'] = serviceid
@@ -596,26 +596,27 @@ def sql_update_job(cursor, update, data):
    )
 
 
-def sql_insert_queue(cursor, queue):
+def sql_insert_queue(cursor, serviceid, queue):
    return(sge.sql_get_create(
       cursor,
-      "SELECT id, name FROM queues WHERE name = %(name)s",
+      "SELECT id, name FROM queues WHERE serviceid = %(serviceid) AND name = %(name)s",
       {
          'name': queue,
       },
-      insert="INSERT INTO queues (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+      insert="INSERT INTO queues (serviceid, name, name_sha1) VALUES (%(serviceid), %(name)s, SHA1(%(name)s))",
       first=True,
    ))
 
 
-def sql_insert_host(cursor, host):
+def sql_insert_host(cursor, serviceid, host):
    return(sge.sql_get_create(
       cursor,
-      "SELECT id, name FROM hosts WHERE name = %(name)s",
+      "SELECT id, name FROM hosts WHERE serviceid = %(serviceid) AND name = %(name)s",
       {
+         'serviceid': serviceid,
          'name': host,
       },
-      insert="INSERT INTO hosts (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+      insert="INSERT INTO hosts (serviceid, name, name_sha1) VALUES (%(serviceid), %(name)s, SHA1(%(name)s))",
       first=True,
    ))
 

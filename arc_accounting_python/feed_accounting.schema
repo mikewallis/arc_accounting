@@ -139,15 +139,19 @@ CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
 
 CREATE TABLE queues(
    id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name_sha1 CHAR(40) UNIQUE KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
    name VARCHAR(1024)
 );
+CREATE UNIQUE INDEX queues_queue on queues (serviceid, name_sha1);
 
 CREATE TABLE hosts(
    id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name_sha1 CHAR(40) UNIQUE KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
    name VARCHAR(1024)
 );
+CREATE UNIQUE INDEX hosts_host on hosts (serviceid, name_sha1);
 
 
 # Tables to contain the job to coproc mapping (many-to-many)
