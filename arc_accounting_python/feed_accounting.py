@@ -93,12 +93,6 @@ def main():
    else:
       raise SystemExit("Error: provide a database credential file")
 
-   sge_add_record = "INSERT INTO sge (" + \
-      ", ".join([f for f in fields]) + \
-      ") VALUES (" + \
-      ", ".join(['%(' + f + ')s' for f in fields]) + \
-      ")"
-
    syslog.openlog()
 
    # Try connecting to database and processing records.
@@ -122,271 +116,21 @@ def main():
          db.commit()
 
          # Initialise state
-
          if args.accountingfile:
-            # Determine number of old sge records
-            cursor.execute(
-               "SELECT count(*) FROM sge WHERE serviceid = %s",
-               (serviceid, ),
-            )
-            acc_max_record = cursor.fetchall()[0]['count(*)']
-            syslog.syslog("Found " + str(acc_max_record) + " old sge " + \
-                          args.service + " records")
-
-            # Open input files and initialise state
-            fh = open(args.accountingfile)
-            acc_record_num = 0
+            i_account = init_accounting(cursor, serviceid, args.service, args.accountingfile)
 
          if args.syslogfile:
-            # Determine number of old syslog records
-
-            sql = sge.sql_get_create(
-               cursor,
-               "SELECT * FROM data_source_state WHERE serviceid = %s AND host = %s AND name = %s",
-               (serviceid, socket.getfqdn(), args.syslogfile ),
-               insert="INSERT INTO data_source_state (serviceid, host, name) VALUES (%s, %s, %s)",
-               first=True,
-            )
-
-            sys_max_record = sql['state']
-            syslog.syslog("Found " + str(sys_max_record) + " old syslog " + \
-                          args.service + " records")
-
-            s_fh = open(args.syslogfile)
-            sys_record_num = 0
-
+            i_syslog = init_syslogfile(cursor, serviceid, args.service, args.syslogfile)
 
          # Process records as they come in
          while True:
-
             # SGE accounting records
             if args.accountingfile:
-
-               # - Process any waiting lines
-               for record in sge.records(accounting=fh):
-                  if acc_record_num >= acc_max_record:
-
-                     record['service'] = args.service
-                     record['serviceid'] = serviceid
-                     record['record'] = acc_record_num
-                     record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
-
-                     if args.debug: print(record['job'], "record accounting")
-
-                     cursor.execute(sge_add_record, record)
-
-                     # Record job as requiring classification
-                     sge.sql_get_create(
-                        cursor,
-                        "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
-                        {
-                           'serviceid': serviceid,
-                           'job': record['job'],
-                           'classified': False,
-                        },
-                        insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
-                        update="UPDATE jobs SET classified=%(classified)s WHERE serviceid = %(serviceid)s AND job = %(job)s",
-                     )
-
-                     db.commit()
-
-                  acc_record_num += 1
+               process_accounting(i_account, args, db, cursor, serviceid)
 
             # Syslog records
             if args.syslogfile:
-
-               # - Process any waiting lines
-               for record in syslog_records(file=s_fh):
-                  sys_record_num += 1
-
-                  # Skip processed lines
-                  if sys_record_num < sys_max_record:
-                     if args.debug: print("skipping line", args.syslogfile, sys_record_num)
-                     continue
-
-                  # Record line as processed
-                  cursor.execute(
-                     "UPDATE data_source_state SET state=%s WHERE serviceid = %s AND host = %s AND name = %s",
-                     (sys_record_num, serviceid, socket.getfqdn(), args.syslogfile ),
-                  )
-
-                  # Allocate to service, flag as needing classification if
-                  # we update the record
-                  record['service'] = args.service
-                  record['serviceid'] = serviceid
-                  record['classified'] = False
-
-                  # Retrieve/create existing record
-                  sql = sge.sql_get_create(
-                     cursor,
-                     "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
-                     record,
-                     insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
-                     first=True,
-                  )
-
-                  # Update fields according to syslog data
-                  if record['type'] == "mpirun":
-
-                     # Get mpirun file record
-                     mpirun = sge.sql_get_create(
-                        cursor,
-                        "SELECT id, name FROM mpiruns WHERE name = %(name)s",
-                        {
-                           'name': record['mpirun_file'],
-                        },
-                        insert="INSERT INTO mpiruns (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
-                        first=True,
-                     )
-
-                     # Add mpirun file to job record if needed
-                     # Mark job as needing fresh classification
-                     sge.sql_get_create(
-                        cursor,
-                        "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
-                        {
-                           'jobid': sql['id'],
-                           'mpirunid': mpirun['id'],
-                        },
-                        insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
-                        oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
-                     )
-
-                     if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
-
-                  elif record['type'] == "sgealloc":
-                     if record['alloc']:
-                        hosts = sql['hosts']
-
-                        for alloc in record['alloc'].split(','):
-                           r = re.match(r"([^@]+)@([^=]+)=(\d+)", alloc)
-                           if r:
-                              q = r.group(1)
-                              h = r.group(2)
-                              slots = r.group(3)
-                              hosts += 1
-
-                              # Get queue record
-                              rec_q = sql_insert_queue(cursor, serviceid, q)
-
-                              # Get host record
-                              rec_h = sql_insert_host(cursor, serviceid, h)
-
-                              # Add allocation to job record if needed
-                              # Mark job as needing fresh classification
-                              sge.sql_get_create(
-                                 cursor,
-                                 "SELECT * FROM job_to_alloc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND queueid = %(queueid)s",
-                                 {
-                                    'jobid': sql['id'],
-                                    'hostid': rec_h['id'],
-                                    'queueid': rec_q['id'],
-                                    'slots': slots,
-                                    'hosts': hosts,
-                                 },
-                                 insert="INSERT INTO job_to_alloc (jobid, hostid, queueid, slots) VALUES (%(jobid)s, %(hostid)s, %(queueid)s, %(slots)s)",
-                                 oninsert="UPDATE jobs SET classified=FALSE, hosts=%(hosts)s WHERE id = %(jobid)s",
-                              )
-
-                              if args.debug: print(record['job'], "update sgealloc")
-
-                  elif record['type'] == "sgenodes":
-                     if record['nodes_nodes']:
-                        if sql['nodes_nodes'] != int(record['nodes_nodes']) or \
-                           sql['nodes_np'] != int(record['nodes_np']) or \
-                           sql['nodes_ppn'] != int(record['nodes_ppn']) or \
-                           sql['nodes_tpp'] != int(record['nodes_tpp']):
-
-                           if args.debug: print(record['job'], "update sgenodes")
-                           sql_update_job(cursor, "nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s", record)
-
-                  elif record['type'] == "sgemodules" or \
-                       record['type'] == "module load":
-
-                     if record['modules']:
-                        for module in record['modules'].split(':'):
-                           # Get module record
-                           mod = sge.sql_get_create(
-                              cursor,
-                              "SELECT id, name FROM modules WHERE name = %(name)s",
-                              {
-                                 'name': module,
-                              },
-                              insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
-                              first=True,
-                           )
-
-                           # Add module file to job record if needed
-                           # Mark job as needing fresh classification
-                           sge.sql_get_create(
-                              cursor,
-                              "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
-                              {
-                                 'jobid': sql['id'],
-                                 'moduleid': mod['id'],
-                              },
-                              insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
-                              oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
-                           )
-
-                        if args.debug: print(record['job'], "module", record['modules'])
-
-                  elif record['type'] == "sge-allocator: Resource stats nvidia":
-
-                     # Get host record
-                     rec_h = sql_insert_host(cursor, serviceid, record['host'])
-
-                     # Get coproc record
-                     # (tag with hostname as coproc name is currently just a
-                     # index on a host. Not necessary if we started using the
-                     # card UUID instead)
-                     rec_cp = sge.sql_get_create(
-                        cursor,
-                        "SELECT id, name, model FROM coprocs WHERE name = %(name)s",
-                        {
-                           'name': record['host'] +":"+ record['name'],
-                           'model': record['model'],
-                           'memory': 1024*1024*int(record['coproc_max_mem']), # bytes
-                        },
-                        insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1, memory) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s), %(memory)s)",
-                        first=True,
-                     )
-
-                     # Add to job record (and update coproc stats) if not seen this allocation before
-                     sge.sql_get_create(
-                        cursor,
-                        "SELECT jobid FROM job_to_coproc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND coprocid = %(coprocid)s",
-                        {
-                           'jobid': sql['id'],
-                           'hostid': rec_h['id'],
-                           'coprocid': rec_cp['id'],
-                           'coproc': sql['coproc'] +1,
-                           'coproc_max_mem': 1024*1024*int(record['coproc_max_mem']), # bytes
-                           'coproc_cpu': float(record['coproc_cpu'])/100, # s
-                           'coproc_mem': float(record['coproc_mem'])/(100*1024), # Gib * s
-                           'coproc_maxvmem': 1024*1024*int(record['coproc_maxvmem']), # bytes
-                           'sum_coproc_max_mem': sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]), # bytes
-                           'sum_coproc_cpu': sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]), # s
-                           'sum_coproc_mem': sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]), # Gib * s
-                           'sum_coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
-                        },
-                        insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid, coproc_max_mem, coproc_cpu, coproc_mem, coproc_maxvmem) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s, %(coproc_max_mem)s, %(coproc_cpu)s, %(coproc_mem)s, %(coproc_maxvmem)s)",
-                        oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(sum_coproc_max_mem)s, coproc_cpu=%(sum_coproc_cpu)s, coproc_mem=%(sum_coproc_mem)s, coproc_maxvmem=%(sum_coproc_maxvmem)s WHERE id = %(jobid)s",
-                     )
-
-                     if args.debug: print(record['job'], "update gpu stats")
-
-                  elif record['type'] == "sgeepilog":
-                     if record['epilog_copy']:
-                        if sql['epilog_copy'] != int(record['epilog_copy']):
-
-                           if args.debug: print(record['job'], "update sgeepilog")
-                           sql_update_job(cursor, "epilog_copy=%(epilog_copy)s", record)
-
-                  else:
-                     if args.debug: print("What the?", record['type'])
-
-                  db.commit()
+               process_syslogfile(i_syslog, args, db, cursor, serviceid)
 
             # Node availability data
             if args.sawrapdir:
@@ -399,6 +143,282 @@ def main():
 
       time.sleep(args.sleep)
 
+def init_accounting(cursor, serviceid, service, fname):
+   # Init constants
+
+   sge_add_record = "INSERT INTO sge (" + \
+      ", ".join([f for f in fields]) + \
+      ") VALUES (" + \
+      ", ".join(['%(' + f + ')s' for f in fields]) + \
+      ")"
+
+   # Determine number of old sge records
+   cursor.execute(
+      "SELECT count(*) FROM sge WHERE serviceid = %s",
+      (serviceid, ),
+   )
+   acc_max_record = cursor.fetchall()[0]['count(*)']
+   syslog.syslog("Found " + str(acc_max_record) + " old sge " + \
+                 service + " records")
+
+   # Open input files and initialise state
+   fh = open(fname)
+   acc_record_num = 0
+
+   return {
+      'fh': fh,
+      'max_record': acc_max_record,
+      'record_num': acc_record_num,
+      'add_record': sge_add_record,
+   }
+
+
+def process_accounting(init, args, db, cursor, serviceid):
+   # - Process any waiting lines
+   for record in sge.records(accounting=init['fh']):
+      if init['record_num'] >= init['max_record']:
+
+         record['service'] = args.service
+         record['serviceid'] = serviceid
+         record['record'] = init['record_num']
+         record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
+
+         if args.debug: print(record['job'], "record accounting")
+
+         cursor.execute(init['add_record'], record)
+
+         # Record job as requiring classification
+         sge.sql_get_create(
+            cursor,
+            "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
+            {
+               'serviceid': serviceid,
+               'job': record['job'],
+               'classified': False,
+            },
+            insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
+            update="UPDATE jobs SET classified=%(classified)s WHERE serviceid = %(serviceid)s AND job = %(job)s",
+         )
+
+         db.commit()
+
+      init['record_num'] += 1
+
+
+def init_syslogfile(cursor, serviceid, service, fname):
+   # Determine number of old syslog records
+
+   sql = sge.sql_get_create(
+      cursor,
+      "SELECT * FROM data_source_state WHERE serviceid = %s AND host = %s AND name = %s",
+      (serviceid, socket.getfqdn(), fname ),
+      insert="INSERT INTO data_source_state (serviceid, host, name) VALUES (%s, %s, %s)",
+      first=True,
+   )
+
+   sys_max_record = sql['state']
+   syslog.syslog("Found " + str(sys_max_record) + " old syslog " + \
+                 service + " records")
+
+   s_fh = open(fname)
+   sys_record_num = 0
+
+   return { 'fh': s_fh, 'max_record': sys_max_record, 'record_num': sys_record_num, 'fname': fname }
+
+
+def process_syslogfile(init, args, db, cursor, serviceid):
+   # - Process any waiting lines
+   for record in syslog_records(file=init['fh']):
+      init['record_num'] += 1
+
+      # Skip processed lines
+      if init['record_num'] < init['max_record']:
+         if args.debug: print("skipping line", init['fname'], init['record_num'])
+         continue
+
+      # Record line as processed
+      cursor.execute(
+         "UPDATE data_source_state SET state=%s WHERE serviceid = %s AND host = %s AND name = %s",
+         (init['record_num'], serviceid, socket.getfqdn(), init['fname'] ),
+      )
+
+      # Allocate to service, flag as needing classification if
+      # we update the record
+      record['service'] = args.service
+      record['serviceid'] = serviceid
+      record['classified'] = False
+
+      # Retrieve/create existing record
+      sql = sge.sql_get_create(
+         cursor,
+         "SELECT * FROM jobs WHERE serviceid = %(serviceid)s AND job = %(job)s",
+         record,
+         insert="INSERT INTO jobs (serviceid, job, classified) VALUES (%(serviceid)s, %(job)s, %(classified)s)",
+         first=True,
+      )
+
+      # Update fields according to syslog data
+      if record['type'] == "mpirun":
+
+         # Get mpirun file record
+         mpirun = sge.sql_get_create(
+            cursor,
+            "SELECT id, name FROM mpiruns WHERE name = %(name)s",
+            {
+               'name': record['mpirun_file'],
+            },
+            insert="INSERT INTO mpiruns (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+            first=True,
+         )
+
+         # Add mpirun file to job record if needed
+         # Mark job as needing fresh classification
+         sge.sql_get_create(
+            cursor,
+            "SELECT * FROM job_to_mpirun WHERE jobid = %(jobid)s AND mpirunid = %(mpirunid)s",
+            {
+               'jobid': sql['id'],
+               'mpirunid': mpirun['id'],
+            },
+            insert="INSERT INTO job_to_mpirun (jobid, mpirunid) VALUES (%(jobid)s, %(mpirunid)s)",
+            oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
+         )
+
+         if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
+
+      elif record['type'] == "sgealloc":
+         if record['alloc']:
+            hosts = sql['hosts']
+
+            for alloc in record['alloc'].split(','):
+               r = re.match(r"([^@]+)@([^=]+)=(\d+)", alloc)
+               if r:
+                  q = r.group(1)
+                  h = r.group(2)
+                  slots = r.group(3)
+                  hosts += 1
+
+                  # Get queue record
+                  rec_q = sql_insert_queue(cursor, serviceid, q)
+
+                  # Get host record
+                  rec_h = sql_insert_host(cursor, serviceid, h)
+
+                  # Add allocation to job record if needed
+                  # Mark job as needing fresh classification
+                  sge.sql_get_create(
+                     cursor,
+                     "SELECT * FROM job_to_alloc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND queueid = %(queueid)s",
+                     {
+                        'jobid': sql['id'],
+                        'hostid': rec_h['id'],
+                        'queueid': rec_q['id'],
+                        'slots': slots,
+                        'hosts': hosts,
+                     },
+                     insert="INSERT INTO job_to_alloc (jobid, hostid, queueid, slots) VALUES (%(jobid)s, %(hostid)s, %(queueid)s, %(slots)s)",
+                     oninsert="UPDATE jobs SET classified=FALSE, hosts=%(hosts)s WHERE id = %(jobid)s",
+                  )
+
+                  if args.debug: print(record['job'], "update sgealloc")
+
+      elif record['type'] == "sgenodes":
+         if record['nodes_nodes']:
+            if sql['nodes_nodes'] != int(record['nodes_nodes']) or \
+               sql['nodes_np'] != int(record['nodes_np']) or \
+               sql['nodes_ppn'] != int(record['nodes_ppn']) or \
+               sql['nodes_tpp'] != int(record['nodes_tpp']):
+
+               if args.debug: print(record['job'], "update sgenodes")
+               sql_update_job(cursor, "nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s", record)
+
+      elif record['type'] == "sgemodules" or \
+           record['type'] == "module load":
+
+         if record['modules']:
+            for module in record['modules'].split(':'):
+               # Get module record
+               mod = sge.sql_get_create(
+                  cursor,
+                  "SELECT id, name FROM modules WHERE name = %(name)s",
+                  {
+                     'name': module,
+                  },
+                  insert="INSERT INTO modules (name, name_sha1) VALUES (%(name)s, SHA1(%(name)s))",
+                  first=True,
+               )
+
+               # Add module file to job record if needed
+               # Mark job as needing fresh classification
+               sge.sql_get_create(
+                  cursor,
+                  "SELECT * FROM job_to_module WHERE jobid = %(jobid)s AND moduleid = %(moduleid)s",
+                  {
+                     'jobid': sql['id'],
+                     'moduleid': mod['id'],
+                  },
+                  insert="INSERT INTO job_to_module (jobid, moduleid) VALUES (%(jobid)s, %(moduleid)s)",
+                  oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
+               )
+
+            if args.debug: print(record['job'], "module", record['modules'])
+
+      elif record['type'] == "sge-allocator: Resource stats nvidia":
+
+         # Get host record
+         rec_h = sql_insert_host(cursor, serviceid, record['host'])
+
+         # Get coproc record
+         # (tag with hostname as coproc name is currently just a
+         # index on a host. Not necessary if we started using the
+         # card UUID instead)
+         rec_cp = sge.sql_get_create(
+            cursor,
+            "SELECT id, name, model FROM coprocs WHERE name = %(name)s",
+            {
+               'name': record['host'] +":"+ record['name'],
+               'model': record['model'],
+               'memory': 1024*1024*int(record['coproc_max_mem']), # bytes
+            },
+            insert="INSERT INTO coprocs (name, name_sha1, model, model_sha1, memory) VALUES (%(name)s, SHA1(%(name)s), %(model)s, SHA1(%(model)s), %(memory)s)",
+            first=True,
+         )
+
+         # Add to job record (and update coproc stats) if not seen this allocation before
+         sge.sql_get_create(
+            cursor,
+            "SELECT jobid FROM job_to_coproc WHERE jobid = %(jobid)s AND hostid = %(hostid)s AND coprocid = %(coprocid)s",
+            {
+               'jobid': sql['id'],
+               'hostid': rec_h['id'],
+               'coprocid': rec_cp['id'],
+               'coproc': sql['coproc'] +1,
+               'coproc_max_mem': 1024*1024*int(record['coproc_max_mem']), # bytes
+               'coproc_cpu': float(record['coproc_cpu'])/100, # s
+               'coproc_mem': float(record['coproc_mem'])/(100*1024), # Gib * s
+               'coproc_maxvmem': 1024*1024*int(record['coproc_maxvmem']), # bytes
+               'sum_coproc_max_mem': sum([1024*1024*int(record['coproc_max_mem']), sql['coproc_max_mem']]), # bytes
+               'sum_coproc_cpu': sum([float(record['coproc_cpu'])/100, sql['coproc_cpu']]), # s
+               'sum_coproc_mem': sum([float(record['coproc_mem'])/(100*1024), sql['coproc_mem']]), # Gib * s
+               'sum_coproc_maxvmem': sum([1024*1024*int(record['coproc_maxvmem']), sql['coproc_maxvmem']]), # bytes
+            },
+            insert="INSERT INTO job_to_coproc (jobid, hostid, coprocid, coproc_max_mem, coproc_cpu, coproc_mem, coproc_maxvmem) VALUES (%(jobid)s, %(hostid)s, %(coprocid)s, %(coproc_max_mem)s, %(coproc_cpu)s, %(coproc_mem)s, %(coproc_maxvmem)s)",
+            oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(sum_coproc_max_mem)s, coproc_cpu=%(sum_coproc_cpu)s, coproc_mem=%(sum_coproc_mem)s, coproc_maxvmem=%(sum_coproc_maxvmem)s WHERE id = %(jobid)s",
+         )
+
+         if args.debug: print(record['job'], "update gpu stats")
+
+      elif record['type'] == "sgeepilog":
+         if record['epilog_copy']:
+            if sql['epilog_copy'] != int(record['epilog_copy']):
+
+               if args.debug: print(record['job'], "update sgeepilog")
+               sql_update_job(cursor, "epilog_copy=%(epilog_copy)s", record)
+
+      else:
+         if args.debug: print("What the?", record['type'])
+
+      db.commit()
 
 def process_sawrapdir(args, db, cursor, serviceid):
    # Check we have all historical data
