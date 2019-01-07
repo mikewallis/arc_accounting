@@ -599,11 +599,12 @@ def sql_update_job(cursor, update, data):
 def sql_insert_queue(cursor, serviceid, queue):
    return(sge.sql_get_create(
       cursor,
-      "SELECT id, name FROM queues WHERE serviceid = %(serviceid) AND name = %(name)s",
+      "SELECT id, name FROM queues WHERE serviceid = %(serviceid)s AND name = %(name)s",
       {
+         'serviceid': serviceid,
          'name': queue,
       },
-      insert="INSERT INTO queues (serviceid, name, name_sha1) VALUES (%(serviceid), %(name)s, SHA1(%(name)s))",
+      insert="INSERT INTO queues (serviceid, name, name_sha1) VALUES (%(serviceid)s, %(name)s, SHA1(%(name)s))",
       first=True,
    ))
 
@@ -611,12 +612,12 @@ def sql_insert_queue(cursor, serviceid, queue):
 def sql_insert_host(cursor, serviceid, host):
    return(sge.sql_get_create(
       cursor,
-      "SELECT id, name FROM hosts WHERE serviceid = %(serviceid) AND name = %(name)s",
+      "SELECT id, name FROM hosts WHERE serviceid = %(serviceid)s AND name = %(name)s",
       {
          'serviceid': serviceid,
          'name': host,
       },
-      insert="INSERT INTO hosts (serviceid, name, name_sha1) VALUES (%(serviceid), %(name)s, SHA1(%(name)s))",
+      insert="INSERT INTO hosts (serviceid, name, name_sha1) VALUES (%(serviceid)s, %(name)s, SHA1(%(name)s))",
       first=True,
    ))
 
