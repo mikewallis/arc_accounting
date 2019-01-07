@@ -126,11 +126,11 @@ def main():
          while True:
             # SGE accounting records
             if args.accountingfile:
-               process_accounting(i_account, args, db, cursor, serviceid)
+               process_accounting(i_account, db, cursor, serviceid, args.service, args.debug)
 
             # Syslog records
             if args.syslogfile:
-               process_syslogfile(i_syslog, args, db, cursor, serviceid)
+               process_syslogfile(i_syslog, db, cursor, serviceid, args.service, args.debug)
 
             # Node availability data
             if args.sawrapdir:
@@ -173,17 +173,17 @@ def init_accounting(cursor, serviceid, service, fname):
    }
 
 
-def process_accounting(init, args, db, cursor, serviceid):
+def process_accounting(init, db, cursor, serviceid, service, debug):
    # - Process any waiting lines
    for record in sge.records(accounting=init['fh']):
       if init['record_num'] >= init['max_record']:
 
-         record['service'] = args.service
+         record['service'] = service
          record['serviceid'] = serviceid
          record['record'] = init['record_num']
          record['job'] = str(record['job_number']) + "." + str(record['task_number'] or 1)
 
-         if args.debug: print(record['job'], "record accounting")
+         if debug: print(record['job'], "record accounting")
 
          cursor.execute(init['add_record'], record)
 
@@ -226,14 +226,14 @@ def init_syslogfile(cursor, serviceid, service, fname):
    return { 'fh': s_fh, 'max_record': sys_max_record, 'record_num': sys_record_num, 'fname': fname }
 
 
-def process_syslogfile(init, args, db, cursor, serviceid):
+def process_syslogfile(init, db, cursor, serviceid, service, debug):
    # - Process any waiting lines
    for record in syslog_records(file=init['fh']):
       init['record_num'] += 1
 
       # Skip processed lines
       if init['record_num'] < init['max_record']:
-         if args.debug: print("skipping line", init['fname'], init['record_num'])
+         if debug: print("skipping line", init['fname'], init['record_num'])
          continue
 
       # Record line as processed
@@ -244,7 +244,7 @@ def process_syslogfile(init, args, db, cursor, serviceid):
 
       # Allocate to service, flag as needing classification if
       # we update the record
-      record['service'] = args.service
+      record['service'] = service
       record['serviceid'] = serviceid
       record['classified'] = False
 
@@ -284,7 +284,7 @@ def process_syslogfile(init, args, db, cursor, serviceid):
             oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
          )
 
-         if args.debug: print(record['job'], "mpirun", record['mpirun_file'])
+         if debug: print(record['job'], "mpirun", record['mpirun_file'])
 
       elif record['type'] == "sgealloc":
          if record['alloc']:
@@ -320,7 +320,7 @@ def process_syslogfile(init, args, db, cursor, serviceid):
                      oninsert="UPDATE jobs SET classified=FALSE, hosts=%(hosts)s WHERE id = %(jobid)s",
                   )
 
-                  if args.debug: print(record['job'], "update sgealloc")
+                  if debug: print(record['job'], "update sgealloc")
 
       elif record['type'] == "sgenodes":
          if record['nodes_nodes']:
@@ -329,7 +329,7 @@ def process_syslogfile(init, args, db, cursor, serviceid):
                sql['nodes_ppn'] != int(record['nodes_ppn']) or \
                sql['nodes_tpp'] != int(record['nodes_tpp']):
 
-               if args.debug: print(record['job'], "update sgenodes")
+               if debug: print(record['job'], "update sgenodes")
                sql_update_job(cursor, "nodes_nodes=%(nodes_nodes)s, nodes_np=%(nodes_np)s, nodes_ppn=%(nodes_ppn)s, nodes_tpp=%(nodes_tpp)s", record)
 
       elif record['type'] == "sgemodules" or \
@@ -361,7 +361,7 @@ def process_syslogfile(init, args, db, cursor, serviceid):
                   oninsert="UPDATE jobs SET classified=FALSE WHERE id = %(jobid)s",
                )
 
-            if args.debug: print(record['job'], "module", record['modules'])
+            if debug: print(record['job'], "module", record['modules'])
 
       elif record['type'] == "sge-allocator: Resource stats nvidia":
 
@@ -406,17 +406,17 @@ def process_syslogfile(init, args, db, cursor, serviceid):
             oninsert="UPDATE jobs SET classified=FALSE, coproc=%(coproc)s, coproc_max_mem=%(sum_coproc_max_mem)s, coproc_cpu=%(sum_coproc_cpu)s, coproc_mem=%(sum_coproc_mem)s, coproc_maxvmem=%(sum_coproc_maxvmem)s WHERE id = %(jobid)s",
          )
 
-         if args.debug: print(record['job'], "update gpu stats")
+         if debug: print(record['job'], "update gpu stats")
 
       elif record['type'] == "sgeepilog":
          if record['epilog_copy']:
             if sql['epilog_copy'] != int(record['epilog_copy']):
 
-               if args.debug: print(record['job'], "update sgeepilog")
+               if debug: print(record['job'], "update sgeepilog")
                sql_update_job(cursor, "epilog_copy=%(epilog_copy)s", record)
 
       else:
-         if args.debug: print("What the?", record['type'])
+         if debug: print("What the?", record['type'])
 
       db.commit()
 
