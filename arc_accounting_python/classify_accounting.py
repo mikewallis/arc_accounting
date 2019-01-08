@@ -14,6 +14,7 @@ import time
 import yaml
 import re
 import os
+import sge
 
 
 def main():
@@ -51,8 +52,19 @@ def main():
          db = mariadb.connect(**credentials)
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
+         # Get service id
+         sql = sge.sql_get_create(
+            cursor,
+            "SELECT id FROM services WHERE name = %s",
+            (args.service,),
+            insert="INSERT INTO services (name) VALUES (%s)",
+            first=True,
+         )
+         serviceid = sql['id']
+         db.commit()
+
          while True:
-            while cursor.execute("SELECT * FROM jobs WHERE service = %s AND classified=FALSE LIMIT %s", (args.service, args.limit)):
+            while cursor.execute("SELECT * FROM jobs WHERE serviceid = %s AND classified=FALSE LIMIT %s", (serviceid, args.limit)):
 
                # Classify waiting records
                for sql in cursor: classify(db, sql)
@@ -281,7 +293,7 @@ def classify(db, record):
             FROM
                sge
             WHERE
-               service = %(service)s
+               serviceid = %(serviceid)s
             AND
                job = %(job)s
          """,
@@ -318,7 +330,7 @@ def classify(db, record):
 
 
    #if args.debug: print(record['id'], "class_app", application)
-   print(record['id'], application, appsource, parallel)
+   print(record['job'], application, appsource, parallel)
 
 
 # Run program (if we've not been imported)
