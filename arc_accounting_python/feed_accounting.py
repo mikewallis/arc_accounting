@@ -437,6 +437,10 @@ def process_sawrapdir(dname, db, cursor, serviceid, debug):
       # Skip if file no longer active
       if not sql['active']: continue
 
+      # Skip if nothing in file
+      st = os.stat(qstat3)
+      if not st.st_size > 0: continue
+
       if debug: print("Processing", qstat3)
       line_num = 0
 
