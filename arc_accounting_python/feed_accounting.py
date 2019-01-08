@@ -134,7 +134,7 @@ def main():
 
             # Node availability data
             if args.sawrapdir:
-               process_sawrapdir(args, db, cursor, serviceid)
+               process_sawrapdir(args.sawrapdir, db, cursor, serviceid, args.debug)
 
             if args.debug: print("sleeping...")
             time.sleep(args.sleep)
@@ -420,10 +420,10 @@ def process_syslogfile(init, db, cursor, serviceid, service, debug):
 
       db.commit()
 
-def process_sawrapdir(args, db, cursor, serviceid):
+def process_sawrapdir(dname, db, cursor, serviceid, debug):
    # Check we have all historical data
-   for fname in os.listdir(args.sawrapdir):
-      qstat3 = os.path.join(args.sawrapdir, fname)
+   for fname in os.listdir(dname):
+      qstat3 = os.path.join(dname, fname)
 
       # Retrieve progress
       sql = sge.sql_get_create(
@@ -437,7 +437,7 @@ def process_sawrapdir(args, db, cursor, serviceid):
       # Skip if file no longer active
       if not sql['active']: continue
 
-      if args.debug: print("Processing", qstat3)
+      if debug: print("Processing", qstat3)
       line_num = 0
 
       for line in sge.open_file(qstat3):
