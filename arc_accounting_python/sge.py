@@ -340,3 +340,35 @@ def sql_get_create(cursor, select, data, insert=None, update=None, oninsert=None
 
    return sql
 
+
+def dbgetfield(db, select, data):
+   import MySQLdb as mariadb
+   cursor = db.cursor()
+
+   field = None
+   cursor.execute(select, data)
+   for d in cursor:
+      field = d[0]
+
+   return field
+
+
+def dbavail(db, service, start, end, queues, skipqueues):
+   serviceid = dbgetfield(db, "SELECT id FROM services WHERE name = %s", (service,))
+
+   select = "SELECT SUM(slots_total*ttl) FROM availability WHERE serviceid = %s AND time > %s AND time <= %s"
+   data = [ serviceid, start, end ]
+
+   if queues:
+      for q in queues:
+         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
+         select += " AND queueid = %s"
+         data.append(queueid)
+
+   if skipqueues:
+      for q in skipqueues:
+         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
+         select += " AND queueid != %s"
+         data.append(queueid)
+
+   return dbgetfield(db, select, data)

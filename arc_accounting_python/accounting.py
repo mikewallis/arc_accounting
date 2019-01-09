@@ -279,7 +279,18 @@ def main():
       # Store info derived from date range
       ##DEBUG - figure out what to do here when range is for all time
       d['date']['hours'] = (d['date']['end'] - d['date']['start'])/float(3600)
-      d['date']['core_hours'] = d['date']['hours'] * args.cores
+
+      # Find total number of possible core hours
+      if args.cores > 0:
+         d['date']['core_hours'] = d['date']['hours'] * args.cores
+      elif args.credfile:
+         # NOTE: assumes there's no significant loss of coverage of
+         # host availability data in the database.
+         for service in args.services:
+            d['date']['core_hours'] = float(sge.dbavail(db, service, d['date']['start'], d['date']['end'], args.queues, args.skipqueues)) /float(3600)
+      else:
+         # No idea
+         d['date']['core_hours'] = 0
 
       # Aggregate info for each user
       for project in d['projusers']:
