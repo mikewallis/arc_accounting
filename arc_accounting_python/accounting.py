@@ -414,7 +414,7 @@ def main():
 
 
    # Spit out answer
-   print_summary(data, args.cores, args.reports, sizebins)
+   print_summary(data, args.reports, sizebins)
 
 
 def process_raw(record, projusers, sizebins):
@@ -625,7 +625,7 @@ def return_size_adj(record):
    return size_adj
 
 
-def summarise_totalsbydate(data, total_cores, bins):
+def summarise_totalsbydate(data, bins):
    headers = [ 'Date', 'Parents', 'Projects', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -718,7 +718,7 @@ def summarise_totalsbydate(data, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_parentsbydate(data, parent, total_cores, bins):
+def summarise_parentsbydate(data, parent, bins):
    headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -815,7 +815,7 @@ def summarise_parentsbydate(data, parent, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_projectsbydate(data, project, total_cores, bins):
+def summarise_projectsbydate(data, project, bins):
    headers = [ 'Date', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -912,7 +912,7 @@ def summarise_projectsbydate(data, project, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_usersbydate(data, user, total_cores, bins):
+def summarise_usersbydate(data, user, bins):
    headers = [ 'Date', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1006,7 +1006,7 @@ def summarise_usersbydate(data, user, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_parents(data, total_cores, bins):
+def summarise_parents(data, bins):
    headers = [ 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1054,7 +1054,7 @@ def summarise_parents(data, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_projects(data, total_cores, bins):
+def summarise_projects(data, bins):
    headers = [ 'Project', 'Parent', 'Users', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1104,7 +1104,7 @@ def summarise_projects(data, total_cores, bins):
    return headers, table, totals
 
 
-def summarise_users(data, total_cores, bins):
+def summarise_users(data, bins):
    headers = [ 'Usr', 'Project(s)', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1154,7 +1154,7 @@ def summarise_users(data, total_cores, bins):
 
    return headers, table, totals
 
-def summarise_project(data, project, total_cores, bins):
+def summarise_project(data, project, bins):
    headers = [ 'Usr', 'Jobs', 'Core Hrs', '%Utl', 'Adj Core Hrs', 'Adj %Utl', 'Core Hrs/Wait', '%Usg', 'Wall %Acc', 'Core %Eff', 'Mem %Eff' ]
    if args.coprocstats: headers.extend(['Coproc %Eff', 'Coproc Mem %Eff'])
    if bins: headers.extend([b['name'] for b in bins])
@@ -1233,7 +1233,7 @@ def print_table(headers, data, totals):
    print(tabulate(tab_data, headers=headers, floatfmt=floatfmt),"\n")
 
 
-def print_summary(data, total_cores, reports, bins):
+def print_summary(data, reports, bins):
 
    print("Fields:")
    print("- %Utl: proportion of total core hours available")
@@ -1248,7 +1248,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=======")
       print("Totals:")
       print("=======\n")
-      print_table(*summarise_totalsbydate(data, total_cores, bins))
+      print_table(*summarise_totalsbydate(data, bins))
 
    if 'all' in reports or 'parentsbydate' in reports:
       print("================")
@@ -1256,7 +1256,7 @@ def print_summary(data, total_cores, reports, bins):
       print("================\n")
       for parent in sorted(set([p for d in data for p in d['parents']])):
          print("Parent:", parent)
-         print_table(*summarise_parentsbydate(data, parent, total_cores, bins))
+         print_table(*summarise_parentsbydate(data, parent, bins))
 
    if 'all' in reports or 'projectsbydate' in reports:
       print("=================")
@@ -1264,7 +1264,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=================\n")
       for project in sorted(set([p for d in data for p in d['projusers']])):
          print("Project:", project)
-         print_table(*summarise_projectsbydate(data, project, total_cores, bins))
+         print_table(*summarise_projectsbydate(data, project, bins))
 
    if 'all' in reports or 'parents' in reports:
       print("============")
@@ -1272,7 +1272,7 @@ def print_summary(data, total_cores, reports, bins):
       print("============\n")
       for d in data:
          print("Period:", d['date']['name'],"\n")
-         print_table(*summarise_parents(d, total_cores, bins))
+         print_table(*summarise_parents(d, bins))
 
    if 'all' in reports or 'projects' in reports:
       print("=============")
@@ -1280,7 +1280,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=============\n")
       for d in data:
          print("Period:", d['date']['name'],"\n")
-         print_table(*summarise_projects(d, total_cores, bins))
+         print_table(*summarise_projects(d, bins))
 
    if 'all' in reports or 'users' in reports:
       print("==========")
@@ -1289,7 +1289,7 @@ def print_summary(data, total_cores, reports, bins):
       for d in data:
          print("Period:", d['date']['name'],"\n")
          print_simplestats(d['users'], args.limitusers)
-         print_table(*summarise_users(d, total_cores, bins))
+         print_table(*summarise_users(d, bins))
 
    if 'all' in reports or 'usersbydate' in reports:
       print("=============")
@@ -1297,7 +1297,7 @@ def print_summary(data, total_cores, reports, bins):
       print("=============\n")
       for user in sorted(set([u for d in data for u in d['users']])):
          print("User:", user)
-         print_table(*summarise_usersbydate(data, user, total_cores, bins))
+         print_table(*summarise_usersbydate(data, user, bins))
 
    if 'all' in reports or 'projectbyusers' in reports:
       print("=====================")
@@ -1309,7 +1309,7 @@ def print_summary(data, total_cores, reports, bins):
          for project in sorted(d['projusers']):
             print("Project:", project)
             print_simplestats(d['projusers'][project], args.limitusers)
-            print_table(*summarise_project(d, project, total_cores, bins))
+            print_table(*summarise_project(d, project, bins))
 
 
 def print_simplestats(data, top_n):
