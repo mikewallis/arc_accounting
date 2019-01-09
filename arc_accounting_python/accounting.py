@@ -26,6 +26,7 @@ from dateutil.relativedelta import relativedelta
 # ----------------------
 
 parser = argparse.ArgumentParser(description='Report on accounting data')
+# Filters
 parser.add_argument('--dates', action='store', type=str, help="Date range in UTC to report on, format [DATE][-[DATE]] where DATE has format YYYY[MM[DD[HH[MM[SS]]]]] e.g. 2018 for that year, 2018-2019 for two years, -2018 for everything up to the start of 2018, 2018- for everything after the start of 2018, 201803 for March 2018, 201806-201905 for 12 months starting June 2018. Multiple ranges supported.")
 parser.add_argument('--queues', action='append', type=str, help="Queue(s) to report on")
 parser.add_argument('--skipqueues', action='append', type=str, help="Queue(s) to filter out")
@@ -35,26 +36,28 @@ parser.add_argument('--projects', action='append', type=str, help="Project(s) to
 parser.add_argument('--skipprojects', action='append', type=str, help="Project(s) to filter out")
 parser.add_argument('--parents', action='append', type=str, help="Project parent(s) to report on")
 parser.add_argument('--skipparents', action='append', type=str, help="Project parent(s) to filter out")
+parser.add_argument('--apps', action='store', type=str, help="Application(s) to report on")
+parser.add_argument('--skipapps', action='store', type=str, help="Application(s) to filter out")
 parser.add_argument('--coreprojects', action='store_true', default=False, help="Report on the core set of projects")
 parser.add_argument('--limitusers', action='store', type=int, default=sys.maxsize, help="Report on n most significant users")
+# Data sources
 parser.add_argument('--accountingfile', action='append', type=str, help="Read accounting data from file")
+parser.add_argument('--services', action='store', type=str, help="Services we are reporting on")
+parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
+
 parser.add_argument('--cores', action='store', default=0, type=int, help="Total number of cores to calculate utilisation percentages from")
-parser.add_argument('--reports', action='append', type=str, help="What information to report on (all, parents, projects, users, projectbyusers, totalsbydate, parentsbydate, projectsbydate, usersbydate)")
+parser.add_argument('--reserved_is_user', action='store_true', default=False, help="In core hour availability, are reservations user time?")
 parser.add_argument('--sizebins', action='append', type=str, help="Job size range to report statistics on, format [START][-[END]]. Multiple ranges supported.")
 parser.add_argument('--noadjust', action='store_true', default=False, help="Do not adjust core hours to account for memory utilisation")
 parser.add_argument('--nocommas', action='store_true', default=False, help="Do not add thousand separators in tables")
 parser.add_argument('--printrecords', action='store_true', default=False, help="Print records to standard out")
+parser.add_argument('--reports', action='append', type=str, help="What information to report on (all, parents, projects, users, projectbyusers, totalsbydate, parentsbydate, projectsbydate, usersbydate)")
 parser.add_argument('--byyear', action='store_true', default=False, help="Report date ranges, year by year")
 parser.add_argument('--bymonth', action='store_true', default=False, help="Report date ranges, month by month")
-parser.add_argument('--services', action='store', type=str, help="Services we are reporting on")
-parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
 parser.add_argument('--byapp', action='store_true', default=False, help="Report on applications, not users")
-parser.add_argument('--apps', action='store', type=str, help="Application(s) to report on")
-parser.add_argument('--skipapps', action='store', type=str, help="Application(s) to filter out")
+parser.add_argument('--byjob', action='store_true', default=False, help="Report on individual jobs")
 parser.add_argument('--coprocstats', action='store_true', default=False, help="Add coproc statistics to reports")
 parser.add_argument('--availstats', action='store_true', default=False, help="Add core hour availability statistics to reports")
-parser.add_argument('--byjob', action='store_true', default=False, help="Report on individual jobs")
-parser.add_argument('--reserved_is_user', action='store_true', default=False, help="In core hour availability, are reservations user time?")
 
 args = parser.parse_args()
 
