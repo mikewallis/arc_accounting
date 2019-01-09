@@ -356,19 +356,28 @@ def dbgetfield(db, select, data):
 def dbavail(db, service, start, end, queues, skipqueues):
    serviceid = dbgetfield(db, "SELECT id FROM services WHERE name = %s", (service,))
 
-   select = "SELECT SUM(slots_total*ttl) FROM availability WHERE serviceid = %s AND time > %s AND time <= %s"
+   # total - total number of slot seconds
+   # avail - number of slot seconds available, counting reservations as not available
+   # avail_usrrsv - number of slots seconds available, counting reservations as available
+   select = {
+      'total': "SELECT SUM(slots_total*ttl)",
+      'avail': "SELECT SUM((slots_total*enabled + (slots_total-GREATEST(slots_used, slots_reserved))*(1-enabled))*available*ttl)",
+      'avail_usrrsv': "SELECT SUM((slots_total*enabled + (slots_total-slots_used)*(1-enabled))*available*ttl)",
+   }
+
+   for s in select: select[s] += " FROM availability WHERE serviceid = %s AND time > %s AND time <= %s"
    data = [ serviceid, start, end ]
 
    if queues:
       for q in queues:
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
-         select += " AND queueid = %s"
+         for s in select: select[s] += " AND queueid = %s"
          data.append(queueid)
 
    if skipqueues:
       for q in skipqueues:
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
-         select += " AND queueid != %s"
+         for s in select: select[s] += " AND queueid != %s"
          data.append(queueid)
 
-   return dbgetfield(db, select, data)
+   return {s: dbgetfield(db, select[s], data) for s in select}

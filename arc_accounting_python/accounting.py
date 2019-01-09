@@ -287,7 +287,8 @@ def main():
          # NOTE: assumes there's no significant loss of coverage of
          # host availability data in the database.
          for service in args.services:
-            d['date']['core_hours'] = float(sge.dbavail(db, service, d['date']['start'], d['date']['end'], args.queues, args.skipqueues)) /float(3600)
+            avail = sge.dbavail(db, service, d['date']['start'], d['date']['end'], args.queues, args.skipqueues)
+            d['date']['core_hours'] = float(avail['total']) /float(3600)
       else:
          # No idea
          d['date']['core_hours'] = 0
