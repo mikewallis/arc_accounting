@@ -210,7 +210,6 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
 
    # Execute query
 
-   print(select,values)
    cursor.execute(select, values)
 
    # Modify and return records

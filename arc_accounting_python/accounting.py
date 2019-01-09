@@ -302,7 +302,6 @@ def main():
          d['date']['core_hours'] = 0
          d['date']['max_core_hours'] = 0
 
-      print(d)
 
       # Aggregate info for each user
       for project in d['projusers']:
