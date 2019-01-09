@@ -53,6 +53,7 @@ parser.add_argument('--apps', action='store', type=str, help="Application(s) to 
 parser.add_argument('--skipapps', action='store', type=str, help="Application(s) to filter out")
 parser.add_argument('--coprocstats', action='store_true', default=False, help="Add coproc statistics to reports")
 parser.add_argument('--byjob', action='store_true', default=False, help="Report on individual jobs")
+parser.add_argument('--reserved_is_user', action='store_true', default=False, help="In core hour availability, are reservations user time?")
 
 args = parser.parse_args()
 
@@ -283,15 +284,25 @@ def main():
       # Find total number of possible core hours
       if args.cores > 0:
          d['date']['core_hours'] = d['date']['hours'] * args.cores
+         d['date']['max_core_hours'] = d['date']['core_hours']
       elif args.credfile:
          # NOTE: assumes there's no significant loss of coverage of
          # host availability data in the database.
          for service in args.services:
             avail = sge.dbavail(db, service, d['date']['start'], d['date']['end'], args.queues, args.skipqueues)
-            d['date']['core_hours'] = float(avail['total']) /float(3600)
+
+            if args.reserved_is_user:
+               d['date']['core_hours'] = float(avail['avail']) /float(3600)
+            else:
+               d['date']['core_hours'] = float(avail['avail_usrrsv']) /float(3600)
+
+            d['date']['max_core_hours'] = float(avail['total']) /float(3600)
       else:
          # No idea
          d['date']['core_hours'] = 0
+         d['date']['max_core_hours'] = 0
+
+      print(d)
 
       # Aggregate info for each user
       for project in d['projusers']:
