@@ -1,13 +1,108 @@
-# Commands to create an appropriate database for feed_accounting in MySQL/MariaDB
+----------------------------------------------------------------------------------
+-- Commands to create an appropriate database for feed_accounting in MySQL/MariaDB
+----------------------------------------------------------------------------------
 
-# Note: 'group' is a reserved word, so 'grp' used instead. 
+-- Note: 'group' is a reserved word, so 'grp' used instead. 
+-- Note: sha1 fields used for indexing large character fields.
 
-# Migrate to using this table
+-- -----
+-- State
+-- -----
+
+-- Data sources (and where we are in processing them)
+CREATE TABLE data_source_state( 
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   host VARCHAR(32),
+   name VARCHAR(1024),
+   active BOOL NOT NULL DEFAULT TRUE,
+   state BIGINT UNSIGNED NOT NULL DEFAULT 0
+);
+
+-- --------
+-- Entities
+-- --------
+
+-- Services (that we have data for)
 CREATE TABLE services(
    id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    name VARCHAR(32) UNIQUE KEY
 );
- 
+
+-- Hosts (that jobs have run on)
+CREATE TABLE hosts(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
+   name VARCHAR(1024)
+);
+CREATE UNIQUE INDEX hosts_host on hosts (serviceid, name_sha1);
+
+-- Batch queues (that jobs have run on)
+CREATE TABLE queues(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
+   name VARCHAR(1024),
+   type VARCHAR(1024)
+);
+CREATE UNIQUE INDEX queues_queue on queues (serviceid, name_sha1);
+
+-- Programs (that users have MPIRUN'd)
+CREATE TABLE mpiruns(
+   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+-- Modules (that users have loaded)
+CREATE TABLE modules(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+-- Coprocessors (e.g. NVIDIA cards)
+CREATE TABLE coprocs(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40),
+   model_sha1 CHAR(40),
+   name VARCHAR(1024),
+   model VARCHAR(1024),
+   memory DOUBLE
+);
+CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);
+
+
+-- -----------------
+-- Availability data
+-- -----------------
+
+-- Node/queue availability data
+CREATE TABLE availability(
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   time INT UNSIGNED NOT NULL, 
+
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   queueid MEDIUMINT UNSIGNED NOT NULL,
+
+   slots_reserved SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   slots_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   slots_total SMALLINT UNSIGNED NOT NULL DEFAULT 0, 
+
+   enabled BOOL NOT NULL,
+   available BOOL NOT NULL,
+
+   ttl SMALLINT UNSIGNED NOT NULL
+);
+CREATE UNIQUE INDEX avail ON availability (serviceid, time, hostid, queueid); 
+
+
+-- --------
+-- Job data
+-- --------
+
+-- Gridengine job accounting data
+-- (raw data - possibly normalise later)
 CREATE TABLE sge( 
    serviceid SMALLINT UNSIGNED NOT NULL,
    record BIGINT UNSIGNED, 
@@ -64,16 +159,7 @@ CREATE UNIQUE INDEX sge_record ON sge (serviceid, record);
 CREATE INDEX sge_job ON sge (serviceid, job); 
 CREATE INDEX sge_job_number ON sge (serviceid, job_number); 
 
-# Table to maintain bookmarks of where we are in our data sources
-CREATE TABLE data_source_state( 
-   serviceid SMALLINT UNSIGNED NOT NULL,
-   host VARCHAR(32),
-   name VARCHAR(1024),
-   active BOOL NOT NULL DEFAULT TRUE,
-   state BIGINT UNSIGNED NOT NULL DEFAULT 0
-);
-
-# Table to contain job data (from syslog, etc.)
+-- Supplemental job data (data collected by us)
 CREATE TABLE jobs(
    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    serviceid SMALLINT UNSIGNED NOT NULL,
@@ -101,36 +187,25 @@ CREATE TABLE jobs(
 CREATE UNIQUE INDEX jobs_record on jobs (serviceid, job);
 CREATE INDEX jobs_classified on jobs (serviceid, classified);
 
+-- -----------------
+-- Relational tables
+-- -----------------
 
-# Tables to contain job to mpirun mapping (many-to-many)
+-- Job to mpirun mapping (many-to-many)
 CREATE TABLE job_to_mpirun(
    jobid BIGINT UNSIGNED NOT NULL,
    mpirunid BIGINT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
 
-CREATE TABLE mpiruns(
-   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name_sha1 CHAR(40) UNIQUE KEY,
-   name VARCHAR(1024)
-);
-
-
-# Tables to contain job to module mapping (many-to-many)
+- Job to module mapping (many-to-many)
 CREATE TABLE job_to_module(
    jobid BIGINT UNSIGNED NOT NULL,
    moduleid MEDIUMINT UNSIGNED NOT NULL
 );
 CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
 
-CREATE TABLE modules(
-   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name_sha1 CHAR(40) UNIQUE KEY,
-   name VARCHAR(1024)
-);
-
-
-# Tables to contain the job to allocation mapping (many-to-many)
+-- Job to host allocation mapping (many-to-many)
 CREATE TABLE job_to_alloc(
    jobid BIGINT UNSIGNED NOT NULL,
    hostid MEDIUMINT UNSIGNED NOT NULL,
@@ -139,25 +214,7 @@ CREATE TABLE job_to_alloc(
 );
 CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
 
-CREATE TABLE queues(
-   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   serviceid SMALLINT UNSIGNED NOT NULL,
-   name_sha1 CHAR(40),
-   name VARCHAR(1024),
-   type VARCHAR(1024)
-);
-CREATE UNIQUE INDEX queues_queue on queues (serviceid, name_sha1);
-
-CREATE TABLE hosts(
-   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   serviceid SMALLINT UNSIGNED NOT NULL,
-   name_sha1 CHAR(40),
-   name VARCHAR(1024)
-);
-CREATE UNIQUE INDEX hosts_host on hosts (serviceid, name_sha1);
-
-
-# Tables to contain the job to coproc mapping (many-to-many)
+-- Job to coprocessor mapping (many-to-many)
 CREATE TABLE job_to_coproc(
    jobid BIGINT UNSIGNED NOT NULL,
    hostid MEDIUMINT UNSIGNED NOT NULL,
@@ -169,32 +226,3 @@ CREATE TABLE job_to_coproc(
 );
 CREATE UNIQUE INDEX job_coproc on job_to_coproc (jobid, hostid, coprocid);
 
-CREATE TABLE coprocs(
-   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name_sha1 CHAR(40),
-   model_sha1 CHAR(40),
-   name VARCHAR(1024),
-   model VARCHAR(1024),
-   memory DOUBLE
-);
-CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);
-
-
-# Tables to contain node availability data
-CREATE TABLE availability(
-   serviceid SMALLINT UNSIGNED NOT NULL,
-   time INT UNSIGNED NOT NULL, 
-
-   hostid MEDIUMINT UNSIGNED NOT NULL,
-   queueid MEDIUMINT UNSIGNED NOT NULL,
-
-   slots_reserved SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-   slots_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
-   slots_total SMALLINT UNSIGNED NOT NULL DEFAULT 0, 
-
-   enabled BOOL NOT NULL,
-   available BOOL NOT NULL,
-
-   ttl SMALLINT UNSIGNED NOT NULL
-);
-CREATE UNIQUE INDEX avail ON availability (serviceid, time, hostid, queueid); 
