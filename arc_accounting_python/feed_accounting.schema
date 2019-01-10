@@ -143,7 +143,8 @@ CREATE TABLE queues(
    id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
    serviceid SMALLINT UNSIGNED NOT NULL,
    name_sha1 CHAR(40),
-   name VARCHAR(1024)
+   name VARCHAR(1024),
+   type VARCHAR(1024)
 );
 CREATE UNIQUE INDEX queues_queue on queues (serviceid, name_sha1);
 
