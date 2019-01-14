@@ -155,9 +155,10 @@ CREATE TABLE sge(
    arid INT UNSIGNED, 
    ar_sub_time INT UNSIGNED 
 ); 
-CREATE UNIQUE INDEX sge_record ON sge (serviceid, record); 
-CREATE INDEX sge_job ON sge (serviceid, job); 
-CREATE INDEX sge_job_number ON sge (serviceid, job_number); 
+CREATE UNIQUE INDEX sge_record ON sge (serviceid, record); -- Not needed?
+CREATE INDEX sge_job ON sge (serviceid, job);  -- Handy for per-task lookups
+CREATE INDEX sge_job_number ON sge (serviceid, job_number);  -- Handy for per-job lookups
+CREATE INDEX sge_accounting ON sge (serviceid, end_time); -- Needed for accounting reporting?
 
 -- Supplemental job data (data collected by us)
 CREATE TABLE jobs(
@@ -184,8 +185,8 @@ CREATE TABLE jobs(
    class_appsource VARCHAR(32),
    class_appdomain VARCHAR(32)
 );
-CREATE UNIQUE INDEX jobs_record on jobs (serviceid, job);
-CREATE INDEX jobs_classified on jobs (serviceid, classified);
+CREATE UNIQUE INDEX jobs_record on jobs (serviceid, job); -- Needed for joins with sge
+CREATE INDEX jobs_classified on jobs (serviceid, classified); -- Needed for classification
 
 -- -----------------
 -- Relational tables
