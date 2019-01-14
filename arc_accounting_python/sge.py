@@ -357,42 +357,51 @@ def dbgetfield(db, select, data):
    return field
 
 
+def dbgetfields(db, select, data):
+   import MySQLdb as mariadb
+   cursor = db.cursor(mariadb.cursors.SSDictCursor)
+
+   field = None
+   cursor.execute(select, data)
+   for d in cursor:
+      field = d
+
+   return field
+
+
 def dbavail(db, service, start, end, queues, skipqueues):
    serviceid = dbgetfield(db, "SELECT id FROM services WHERE name = %s", (service,))
 
    # total - total number of slot seconds
    # avail - number of slot seconds available, counting reservations as not available
    # avail_usrrsv - number of slots seconds available, counting reservations as available
-   select = {
-      'total': "SELECT SUM(slots_total*ttl)",
-      'avail': "SELECT SUM((slots_total*enabled + (slots_total-GREATEST(slots_used, slots_reserved))*(1-enabled))*available*ttl)",
-      'avail_usrrsv': "SELECT SUM((slots_total*enabled + (slots_total-slots_used)*(1-enabled))*available*ttl)",
-   }
+   fields = (
+      "SUM(slots_total*ttl) AS total",
+      "SUM((slots_total*enabled + (slots_total-GREATEST(slots_used, slots_reserved))*(1-enabled))*available*ttl) AS avail",
+      "SUM((slots_total*enabled + (slots_total-slots_used)*(1-enabled))*available*ttl) AS avail_usrrsv",
+   )
 
-   for s in select: select[s] += " FROM availability WHERE serviceid = %s AND time > %s AND time <= %s"
+   select = "SELECT " + ",".join(fields) + " FROM availability WHERE serviceid = %s AND time > %s AND time <= %s"
+
    data = [ serviceid, start, end ]
 
    if queues:
-      for s in select: select[s] += " AND ("
+      select += " AND ("
 
       for q in enumerate(queues):
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q[1]))
          if queueid:
-            for s in select:
-               if q[0] > 0: select[s] += " OR "
-               select[s] += "queueid = %s"
-
+            if q[0] > 0: select += " OR "
+            select += "queueid = %s"
             data.append(queueid)
 
-      for s in select: select[s] += ")"
+      select += ")"
 
    if skipqueues:
       for q in skipqueues:
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
          if queueid:
-            for s in select: select[s] += " AND queueid != %s"
+            select += " AND queueid != %s"
             data.append(queueid)
 
-   for s in select: print(select[s], data)
-
-   return {s: dbgetfield(db, select[s], data) for s in select}
+   return dbgetfields(db, select, data)
