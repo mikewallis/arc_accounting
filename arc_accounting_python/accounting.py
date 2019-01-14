@@ -289,6 +289,10 @@ def main():
       ##DEBUG - figure out what to do here when range is for all time
       d['date']['hours'] = (d['date']['end'] - d['date']['start'])/float(3600)
 
+      # Initialise
+      if 'core_hours' not in d['date']: d['date']['core_hours'] = 0.0
+      if 'max_core_hours' not in d['date']: d['date']['max_core_hours'] = 0.0
+
       # Find total number of possible core hours
       if args.cores > 0:
          d['date']['core_hours'] = d['date']['hours'] * args.cores
@@ -300,16 +304,11 @@ def main():
             avail = sge.dbavail(db, service, d['date']['start'], d['date']['end'], args.queues, args.skipqueues)
 
             if args.reserved_is_user:
-               d['date']['core_hours'] = float(avail['avail']) /float(3600)
+               d['date']['core_hours'] += float(avail['avail'] or 0) /float(3600)
             else:
-               d['date']['core_hours'] = float(avail['avail_usrrsv']) /float(3600)
+               d['date']['core_hours'] += float(avail['avail_usrrsv'] or 0) /float(3600)
 
-            d['date']['max_core_hours'] = float(avail['total']) /float(3600)
-      else:
-         # No idea
-         d['date']['core_hours'] = 0
-         d['date']['max_core_hours'] = 0
-
+            d['date']['max_core_hours'] += float(avail['total'] or 0) /float(3600)
 
       # Aggregate info for each user
       for project in d['projusers']:

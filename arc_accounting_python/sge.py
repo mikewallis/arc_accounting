@@ -368,10 +368,17 @@ def dbavail(db, service, start, end, queues, skipqueues):
    data = [ serviceid, start, end ]
 
    if queues:
-      for q in queues:
-         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
-         for s in select: select[s] += " AND queueid = %s"
+      for s in select: select[s] += " AND ("
+
+      for q in enumerate(queues):
+         queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q[1]))
+         for s in select:
+            if q[0] > 0: select[s] += " OR "
+            select[s] += "queueid = %s"
+
          data.append(queueid)
+
+      for s in select: select[s] += ")"
 
    if skipqueues:
       for q in skipqueues:
