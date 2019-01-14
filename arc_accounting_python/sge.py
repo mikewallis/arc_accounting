@@ -202,9 +202,14 @@ def dbrecords(db, service, filter_spec=None, fields=('*', ), modify=None):
    values = [ serviceid, serviceid ]
    for sp in filter_spec:
       for f, act in sp.items():
+         if act == '==':
+            conj = " OR "
+         else:
+            conj = " AND "
+
          for op, vals in act.items():
             values.extend(vals)
-            where.append("("+ " OR ".join([f +" "+ op + " %s"]*len(vals)) +")")
+            where.append("("+ conj.join([f +" "+ op + " %s"]*len(vals)) +")")
 
    select += " AND ".join(where)
 
@@ -372,18 +377,22 @@ def dbavail(db, service, start, end, queues, skipqueues):
 
       for q in enumerate(queues):
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q[1]))
-         for s in select:
-            if q[0] > 0: select[s] += " OR "
-            select[s] += "queueid = %s"
+         if queueid:
+            for s in select:
+               if q[0] > 0: select[s] += " OR "
+               select[s] += "queueid = %s"
 
-         data.append(queueid)
+            data.append(queueid)
 
       for s in select: select[s] += ")"
 
    if skipqueues:
       for q in skipqueues:
          queueid = dbgetfield(db, "SELECT id FROM queues WHERE serviceid = %s AND name = %s", (serviceid, q))
-         for s in select: select[s] += " AND queueid != %s"
-         data.append(queueid)
+         if queueid:
+            for s in select: select[s] += " AND queueid != %s"
+            data.append(queueid)
+
+   for s in select: print(select[s], data)
 
    return {s: dbgetfield(db, select[s], data) for s in select}
