@@ -232,9 +232,7 @@ def process_syslogfile(init, db, cursor, serviceid, service, debug):
       init['record_num'] += 1
 
       # Skip processed lines
-      if init['record_num'] < init['max_record']:
-         if debug: print("skipping line", init['fname'], init['record_num'])
-         continue
+      if init['record_num'] < init['max_record']: continue
 
       # Record line as processed
       cursor.execute(
