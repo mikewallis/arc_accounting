@@ -638,7 +638,7 @@ def return_size_adj(record):
       #size_adj = math.ceil(mem_req / float(mem_core))
       size_adj = max(1, mem_req / float(mem_core))
    else:
-      print("Warning: could not extract mem or mem per node details for", record['name'],"("+record['category']+")", file=sys.stderr)
+      print("Warning: could not extract mem or mem per node details for", record['job'],"("+record['category']+")", file=sys.stderr)
 
    return size_adj
 
