@@ -20,7 +20,7 @@ import sge
 def main():
    # Command line arguments
    parser = argparse.ArgumentParser(description='Classify accounting data')
-   parser.add_argument('--service', action='store', type=str, help="Service name to tag records")
+   parser.add_argument('--services', action='store', type=str, help="Service names to process records for")
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
@@ -38,8 +38,10 @@ def main():
       reportmpi(credentials)
       raise SystemExit
 
-   if not args.service:
-      raise SystemExit("Error: provide a service name argument")
+   if not args.services:
+      raise SystemExit("Error: provide service name arguments")
+
+   args.services = commasep_list(args.services)
 
    syslog.openlog()
 
@@ -52,25 +54,28 @@ def main():
          db = mariadb.connect(**credentials)
          cursor = db.cursor(mariadb.cursors.DictCursor)
 
-         # Get service id
-         sql = sge.sql_get_create(
-            cursor,
-            "SELECT id FROM services WHERE name = %s",
-            (args.service,),
-            insert="INSERT INTO services (name) VALUES (%s)",
-            first=True,
-         )
-         serviceid = sql['id']
-         db.commit()
-
          while True:
-            while cursor.execute("SELECT * FROM jobs WHERE serviceid = %s AND classified=FALSE LIMIT %s", (serviceid, args.limit)):
+            for service in args.services:
 
-               # Classify waiting records
-               for sql in cursor: classify(db, sql)
-
-               # Commit and obtain an up to date view of database state
+               # Get service id
+               sql = sge.sql_get_create(
+                  cursor,
+                  "SELECT id,name FROM services WHERE name = %s",
+                  (service,),
+                  insert="INSERT INTO services (name) VALUES (%s)",
+                  first=True,
+               )
+               serviceid = sql['id']
                db.commit()
+
+               # Search for unclassified records
+               while cursor.execute("SELECT * FROM jobs WHERE serviceid = %s AND classified=FALSE LIMIT %s", (serviceid, args.limit)):
+
+                  # Classify waiting records
+                  for sql in cursor: classify(db, sql, service, args.debug)
+
+                  # Commit and obtain an up to date view of database state
+                  db.commit()
 
             if args.debug: print("sleeping...")
             time.sleep(args.sleep)
@@ -214,7 +219,7 @@ def classify_mpirun(file):
    return (application, appsource, parallel)
 
 
-def classify(db, record):
+def classify(db, record, service, debug):
 
    cursor = db.cursor()
 
@@ -329,8 +334,21 @@ def classify(db, record):
    )
 
 
-   #if args.debug: print(record['id'], "class_app", application)
-   print(record['job'], application, appsource, parallel)
+   if debug: print(service, record['job'], application, appsource, parallel)
+
+
+# Returns input expanded into a list, split
+# as comma separate entries
+def commasep_list(data):
+   l = []
+
+   if type(data) == type([]):
+      for d in data:
+         l.extend(d.split(","))
+   elif data:
+      l.extend(data.split(","))
+
+   return l
 
 
 # Run program (if we've not been imported)
