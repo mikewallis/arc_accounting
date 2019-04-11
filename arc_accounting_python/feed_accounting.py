@@ -101,7 +101,7 @@ def main():
       if args.debug: print("Entering main loop")
       try:
          # Disconnect any previous session
-         if 'db' in locals(): dbtidy(db)
+         if 'db' in locals(): sge.dbtidy(db)
 
          # Connect to database
          db = mariadb.connect(**credentials)
