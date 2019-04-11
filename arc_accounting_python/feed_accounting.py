@@ -82,6 +82,7 @@ def main():
    parser.add_argument('--sleep', action='store', type=int, default=300, help="Time to sleep between loop trips")
    parser.add_argument('--credfile', action='store', type=str, help="YAML credential file")
    parser.add_argument('--debug', action='store_true', default=False, help="Print debugging messages")
+   parser.add_argument('--pidfile', action='store', help="Store program PID in file")
    args = parser.parse_args()
 
    if not args.service:
@@ -92,6 +93,10 @@ def main():
          credentials = yaml.safe_load(stream)
    else:
       raise SystemExit("Error: provide a database credential file")
+
+   if args.pidfile:
+      with open(args.pidfile, 'w') as stream:
+         stream.write(str(os.getpid()))
 
    syslog.openlog()
 
