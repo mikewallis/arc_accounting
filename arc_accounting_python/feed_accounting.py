@@ -100,6 +100,9 @@ def main():
    while True:
       if args.debug: print("Entering main loop")
       try:
+         # Disconnect any previous session
+         if 'db' in locals(): dbtidy(db)
+
          # Connect to database
          db = mariadb.connect(**credentials)
          cursor = db.cursor(mariadb.cursors.DictCursor)

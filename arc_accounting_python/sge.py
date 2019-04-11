@@ -369,6 +369,14 @@ def dbgetfields(db, select, data):
    return field
 
 
+# Tidy/close database connection
+def dbtidy(db):
+   try:
+      db.close()
+   except:
+      None
+
+
 def dbavail(db, service, start, end, queues, skipqueues):
    serviceid = dbgetfield(db, "SELECT id FROM services WHERE name = %s", (service,))
 
