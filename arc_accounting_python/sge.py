@@ -97,13 +97,14 @@ def open_file(file):
 # Generator
 # Walks all accounting records, returning a dictionary per record
 # Allows retrieval of all records, or just one at a time.
-def records(accounting = os.environ["SGE_ROOT"] +
-                        "/" +
-                        os.environ["SGE_CELL"] +
-                        "/common/accounting",
+def records(accounting = None,
             filter = None,
             modify = None,
           ):
+
+   # If given no datasource, look at default location
+   if accounting == None:
+      accounting = os.environ["SGE_ROOT"] + "/" + os.environ["SGE_CELL"] + "/common/accounting"
 
    # Iterate non-strings directly, as we may be tailing a stram
    # of accounting data where the parent has open/close control
