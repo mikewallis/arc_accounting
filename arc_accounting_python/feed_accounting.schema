@@ -1,0 +1,229 @@
+----------------------------------------------------------------------------------
+-- Commands to create an appropriate database for feed_accounting in MySQL/MariaDB
+----------------------------------------------------------------------------------
+
+-- Note: 'group' is a reserved word, so 'grp' used instead. 
+-- Note: sha1 fields used for indexing large character fields.
+
+-- -----
+-- State
+-- -----
+
+-- Data sources (and where we are in processing them)
+CREATE TABLE data_source_state( 
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   host VARCHAR(32),
+   name VARCHAR(1024),
+   active BOOL NOT NULL DEFAULT TRUE,
+   state BIGINT UNSIGNED NOT NULL DEFAULT 0
+);
+
+-- --------
+-- Entities
+-- --------
+
+-- Services (that we have data for)
+CREATE TABLE services(
+   id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name VARCHAR(32) UNIQUE KEY
+);
+
+-- Hosts (that jobs have run on)
+CREATE TABLE hosts(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
+   name VARCHAR(1024)
+);
+CREATE UNIQUE INDEX hosts_host on hosts (serviceid, name_sha1);
+
+-- Batch queues (that jobs have run on)
+CREATE TABLE queues(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   name_sha1 CHAR(40),
+   name VARCHAR(1024),
+   type VARCHAR(1024)
+);
+CREATE UNIQUE INDEX queues_queue on queues (serviceid, name_sha1);
+
+-- Programs (that users have MPIRUN'd)
+CREATE TABLE mpiruns(
+   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+-- Modules (that users have loaded)
+CREATE TABLE modules(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40) UNIQUE KEY,
+   name VARCHAR(1024)
+);
+
+-- Coprocessors (e.g. NVIDIA cards)
+CREATE TABLE coprocs(
+   id MEDIUMINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   name_sha1 CHAR(40),
+   model_sha1 CHAR(40),
+   name VARCHAR(1024),
+   model VARCHAR(1024),
+   memory DOUBLE
+);
+CREATE UNIQUE INDEX coproc_coproc on coprocs (name_sha1, model_sha1);
+
+
+-- -----------------
+-- Availability data
+-- -----------------
+
+-- Node/queue availability data
+CREATE TABLE availability(
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   time INT UNSIGNED NOT NULL, 
+
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   queueid MEDIUMINT UNSIGNED NOT NULL,
+
+   slots_reserved SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   slots_used SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   slots_total SMALLINT UNSIGNED NOT NULL DEFAULT 0, 
+
+   enabled BOOL NOT NULL,
+   available BOOL NOT NULL,
+
+   ttl SMALLINT UNSIGNED NOT NULL
+);
+CREATE UNIQUE INDEX avail ON availability (serviceid, time, hostid, queueid); 
+
+
+-- --------
+-- Job data
+-- --------
+
+-- Gridengine job accounting data
+-- (raw data - possibly normalise later)
+CREATE TABLE sge( 
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   record BIGINT UNSIGNED, 
+   epoch SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   job VARCHAR(32),
+
+   qname VARCHAR(1024), 
+   hostname VARCHAR(1024), 
+   grp VARCHAR(1024), 
+   owner VARCHAR(1024), 
+   job_name VARCHAR(1024), 
+   job_number INT UNSIGNED, 
+   account VARCHAR(1024), 
+   priority DOUBLE, 
+   submission_time INT UNSIGNED, 
+   start_time INT UNSIGNED, 
+   end_time INT UNSIGNED, 
+   failed INT, 
+   exit_status INT, 
+   ru_wallclock DOUBLE, 
+   ru_utime DOUBLE, 
+   ru_stime DOUBLE, 
+   ru_maxrss DOUBLE, 
+   ru_ixrss DOUBLE, 
+   ru_ismrss DOUBLE, 
+   ru_idrss DOUBLE, 
+   ru_isrss DOUBLE, 
+   ru_minflt DOUBLE, 
+   ru_majflt DOUBLE, 
+   ru_nswap DOUBLE, 
+   ru_inblock DOUBLE, 
+   ru_oublock DOUBLE, 
+   ru_msgsnd DOUBLE, 
+   ru_msgrcv DOUBLE, 
+   ru_nsignals DOUBLE, 
+   ru_nvcsw DOUBLE, 
+   ru_nivcsw DOUBLE, 
+   project VARCHAR(1024), 
+   department VARCHAR(1024), 
+   granted_pe VARCHAR(1024), 
+   slots INT UNSIGNED, 
+   task_number INT, 
+   cpu DOUBLE, 
+   mem DOUBLE, 
+   io DOUBLE, 
+   category VARCHAR(1024), 
+   iow DOUBLE, 
+   pe_taskid VARCHAR(1024), 
+   maxvmem DOUBLE, 
+   arid INT UNSIGNED, 
+   ar_sub_time INT UNSIGNED 
+); 
+CREATE UNIQUE INDEX sge_record ON sge (serviceid, record); -- Not needed?
+CREATE INDEX sge_job ON sge (serviceid, job);  -- Handy for per-task lookups
+CREATE INDEX sge_job_number ON sge (serviceid, job_number);  -- Handy for per-job lookups
+CREATE INDEX sge_accounting ON sge (serviceid, end_time); -- Needed for accounting reporting?
+
+-- Supplemental job data (data collected by us)
+CREATE TABLE jobs(
+   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+   serviceid SMALLINT UNSIGNED NOT NULL,
+   epoch SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+   job VARCHAR(32),
+
+   hosts INT UNSIGNED NOT NULL DEFAULT 0,
+   nodes_nodes INT UNSIGNED,
+   nodes_np INT UNSIGNED,
+   nodes_ppn INT UNSIGNED,
+   nodes_tpp INT UNSIGNED,
+   coproc INT UNSIGNED NOT NULL DEFAULT 0,
+   coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_maxvmem DOUBLE NOT NULL DEFAULT 0.0,
+   epilog_copy DOUBLE NOT NULL DEFAULT 0.0,
+   classified BOOL NOT NULL DEFAULT FALSE,
+   class_parallel VARCHAR(8),
+   class_ptype VARCHAR(16),
+   class_app VARCHAR(32),
+   class_appsource VARCHAR(32),
+   class_appdomain VARCHAR(32)
+);
+CREATE UNIQUE INDEX jobs_record on jobs (serviceid, job); -- Needed for joins with sge
+CREATE INDEX jobs_classified on jobs (serviceid, classified); -- Needed for classification
+
+-- -----------------
+-- Relational tables
+-- -----------------
+
+-- Job to mpirun mapping (many-to-many)
+CREATE TABLE job_to_mpirun(
+   jobid BIGINT UNSIGNED NOT NULL,
+   mpirunid BIGINT UNSIGNED NOT NULL
+);
+CREATE UNIQUE INDEX job_mpirun on job_to_mpirun (jobid, mpirunid);
+
+- Job to module mapping (many-to-many)
+CREATE TABLE job_to_module(
+   jobid BIGINT UNSIGNED NOT NULL,
+   moduleid MEDIUMINT UNSIGNED NOT NULL
+);
+CREATE UNIQUE INDEX job_module on job_to_module (jobid, moduleid);
+
+-- Job to host allocation mapping (many-to-many)
+CREATE TABLE job_to_alloc(
+   jobid BIGINT UNSIGNED NOT NULL,
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   queueid MEDIUMINT UNSIGNED NOT NULL,
+   slots INT UNSIGNED NOT NULL
+);
+CREATE UNIQUE INDEX job_alloc on job_to_alloc (jobid, hostid, queueid);
+
+-- Job to coprocessor mapping (many-to-many)
+CREATE TABLE job_to_coproc(
+   jobid BIGINT UNSIGNED NOT NULL,
+   hostid MEDIUMINT UNSIGNED NOT NULL,
+   coprocid MEDIUMINT UNSIGNED NOT NULL,
+   coproc_max_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_cpu DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_mem DOUBLE NOT NULL DEFAULT 0.0,
+   coproc_maxvmem DOUBLE NOT NULL DEFAULT 0.0
+);
+CREATE UNIQUE INDEX job_coproc on job_to_coproc (jobid, hostid, coprocid);
+
